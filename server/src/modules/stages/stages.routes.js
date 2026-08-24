@@ -5,7 +5,20 @@ import { validate } from '../../middleware/validate.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { recordAudit, diff } from '../../services/audit.service.js';
 import { AUDIT_ACTION, AUDIT_ENTITY, MODULES, ACTIONS } from '../../config/constants.js';
+import { z } from 'zod';
 import { stageParams, projectParam, updateStatusSchema, assignStageSchema, addDocumentSchema } from './stages.schema.js';
+
+const signoffSchema = z.object({
+  decision: z.enum(['APPROVED', 'REJECTED']),
+  note: z.string().trim().max(2000).optional().nullable(),
+});
+
+const stagePermissionsSchema = z.object({
+  grants: z.array(z.object({
+    roleId: z.coerce.number().int().positive(),
+    action: z.string().trim().min(2).max(40),
+  })),
+});
 
 const router = Router({ mergeParams: true });
 
@@ -31,6 +44,54 @@ router.patch(
       req.ip,
     );
     res.json(result);
+  }),
+);
+
+router.get(
+  '/:stageId',
+  requirePermission(MODULES.STAGES, ACTIONS.READ),
+  validate({ params: stageParams }),
+  asyncHandler((req, res) => {
+    res.json(stagesService.detail(req.user, req.params.projectId, req.params.stageId));
+  }),
+);
+
+router.post(
+  '/:stageId/signoff',
+  requirePermission(MODULES.STAGES, ACTIONS.READ),
+  validate({ params: stageParams, body: signoffSchema }),
+  asyncHandler((req, res) => {
+    res.status(201).json(
+      stagesService.recordSignoff(req.user, req.params.projectId, req.params.stageId, req.body, req.ip),
+    );
+  }),
+);
+
+router.get(
+  '/:stageId/permissions',
+  requirePermission(MODULES.STAGES, ACTIONS.READ),
+  validate({ params: stageParams }),
+  asyncHandler((req, res) => {
+    res.json({ permissions: stagesService.stagePermissions(req.user, req.params.projectId, req.params.stageId) });
+  }),
+);
+
+router.put(
+  '/:stageId/permissions',
+  requirePermission(MODULES.ROLES, ACTIONS.UPDATE),
+  validate({ params: stageParams, body: stagePermissionsSchema }),
+  asyncHandler((req, res) => {
+    const permissions = stagesService.setStagePermissions(
+      req.user, req.params.projectId, req.params.stageId, req.body.grants,
+    );
+    recordAudit(req, {
+      entityType: AUDIT_ENTITY.PROJECT_STAGE,
+      entityId: req.params.stageId,
+      action: AUDIT_ACTION.UPDATE,
+      summary: `Stage-level permissions updated for stage ${req.params.stageId}`,
+      newValue: { grants: req.body.grants },
+    });
+    res.json({ permissions });
   }),
 );
 

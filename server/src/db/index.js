@@ -8,7 +8,6 @@ const require = createRequire(import.meta.url);
 let db;
 let driverName;
 
-// Native addon: needs a prebuilt binary for this platform and Node ABI.
 function openWithBetterSqlite3(file) {
   const Database = require('better-sqlite3');
   const handle = new Database(file);
@@ -18,7 +17,6 @@ function openWithBetterSqlite3(file) {
   return handle;
 }
 
-// Fallback, built into Node 22.5+. No binary, no compiler.
 function openWithNodeSqlite(file) {
   const { DatabaseSync } = require('node:sqlite');
   const handle = new DatabaseSync(file);
@@ -27,10 +25,8 @@ function openWithNodeSqlite(file) {
   handle.exec('PRAGMA foreign_keys = ON');
   handle.exec('PRAGMA busy_timeout = 5000');
 
-  // node:sqlite returns null-prototype rows.
   const plain = (row) => (row === undefined || row === null ? row : { ...row });
 
-  // Nested transactions become SAVEPOINTs, matching better-sqlite3.
   let depth = 0;
 
   return {

@@ -83,7 +83,13 @@ describe('Rule 4 · client data is filtered server-side', () => {
     const acme = await seededProject(app, admin.token, 'ACM-SEC-2026');
 
     const list = await as(app, client.token).get('/api/projects');
-    expect(list.body.items.map((p) => p.code)).toEqual(['NWL-ERP-2026']);
+    const codes = list.body.items.map((p) => p.code);
+
+    // Assert the rule, not the fixture: every project returned belongs to the
+    // client's own organisation, and none belongs to anyone else.
+    expect(codes.length).toBeGreaterThan(0);
+    expect(list.body.items.every((p) => p.clientName === 'Northwind Logistics')).toBe(true);
+    expect(codes).not.toContain('ACM-SEC-2026');
 
     expect((await as(app, client.token).get(`/api/projects/${acme.id}`)).status).toBe(404);
   });

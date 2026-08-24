@@ -8,6 +8,11 @@ import projectsReducer from '../features/projects/projectsSlice.js';
 import stagesReducer from '../features/stages/stagesSlice.js';
 import auditReducer from '../features/audit/auditSlice.js';
 import uiReducer, { pushToast } from '../features/ui/uiSlice.js';
+import bugsReducer from '../features/bugs/bugsSlice.js';
+import notificationsReducer from '../features/notifications/notificationsSlice.js';
+import settingsReducer from '../features/settings/settingsSlice.js';
+import reportsReducer from '../features/reports/reportsSlice.js';
+import searchReducer from '../features/search/searchSlice.js';
 
 export const store = configureStore({
   reducer: {
@@ -18,6 +23,11 @@ export const store = configureStore({
     stages: stagesReducer,
     audit: auditReducer,
     ui: uiReducer,
+    bugs: bugsReducer,
+    notifications: notificationsReducer,
+    settings: settingsReducer,
+    reports: reportsReducer,
+    search: searchReducer,
   },
 });
 

@@ -8,8 +8,14 @@ Members** manually update stage statuses with full history tracking.
 **Client/Operations** users get a filtered read-only view, with restricted data
 stripped **at the API**, not merely hidden in the UI.
 
-Built for the Phase 1 brief: *Foundation & Workflow* — React · Redux Toolkit ·
-Node.js · Express · JWT.
+The Project screen is a working area, not a dashboard: **Overview · Assign ·
+Workflow · Team · Documents**. Stages open into a drawer where you update
+status, attach evidence, record sign-off, and run the QA↔Development bug loop.
+
+Clients need no account — they enter a **BRD number** and see only their own
+stages, progress, owner and dates.
+
+React · Redux Toolkit · Node.js · Express · JWT.
 
 ---
 
@@ -56,12 +62,20 @@ the API with hot reload. Open <http://localhost:5173> and sign in.
 | Super Admin | `superadmin@itwf.dev` | SOP Builder |
 | Admin | `admin@itwf.dev` | User Management |
 | IT Team Member | `itmember@itwf.dev` | My Work |
-| IT Team Member (2) | `itmember2@itwf.dev` | My Work |
+| IT Team Member (2) | `itmember2@itwf.dev` | My Work — plays the *development* side of the bug loop |
+| QA (IT Team Member) | `qa@itwf.dev` | My Work — plays the *QA* side of the bug loop |
 | Client / Operations | `client@itwf.dev` | Projects (read-only) |
 
-The seed creates all four roles, five users, and one **published** SOP with
-**5 stages — 3 client-visible, 2 hidden** — plus two demo projects whose boards
-are already partly worked, so every status renders somewhere.
+The seed creates all four roles, six users, and two **published** SOPs:
+
+- **Standard IT Onboarding SOP** — 5 stages, 3 client-visible, 2 hidden, exactly
+  as the Phase 1 brief specifies. Used by two demo projects.
+- **Software Delivery SOP** — 6 stages including a `TESTING` stage that carries
+  the bug loop and stages that require sign-off. Used by `NWL-PORTAL-2026`,
+  which is seeded mid-flight with open bugs so the Testing-close rule is
+  visible on first load.
+
+No login needed for client tracking — see [Public tracking](#public-tracking-no-login).
 
 ### Other commands
 
@@ -105,6 +119,24 @@ ACTIVE_ASSIGNMENTS` and the reassign modal opens listing the three stages that
 block it. Move them to Marco, then deactivate — it succeeds.
 
 ---
+
+### Phase 2 rules
+
+| Rule | Try it |
+|---|---|
+| **Stages never progress automatically** | Attach evidence on any stage — the response says `statusUnchanged: true` and the board does not move. |
+| **Status and % are derived from stages** | Open `NWL-PORTAL-2026` → Overview. The 50% and `IN PROGRESS` are computed from the six stage rows; nothing stores them. Block a stage and the project reads `AT_RISK`. |
+| **Testing cannot close with open bugs** | Open `NWL-PORTAL-2026` → Workflow → *System Testing*. The drawer says *Cannot complete yet* and lists the two open bugs. Close them all, then it still asks for sign-off. |
+| **Internal stages filtered server-side** | Sign in as `client@itwf.dev`: 4 of 6 stages. Or `curl 'localhost:4000/api/public/track?brd=BRD-2026-0042'` — the internal stages are absent from the JSON, not hidden by CSS. |
+| **Permissions at stage level** | As `qa@itwf.dev`, *System Testing* offers Raise bug; *Development* does not. Both stages, same project, same role. |
+| **Every change audited** | Audit Log shows stage transitions, bug events, sign-offs and public BRD lookups (actor `PUBLIC`). |
+
+### The bug loop
+
+`OPEN → IN_PROGRESS → FIXED → RETEST → CLOSED`, with `REOPENED` sending it
+back to development. Illegal jumps are rejected with the allowed set — a
+`CLOSED` bug cannot be moved at all. QA raises and closes; development
+resolves. Which side you are on is a stage-level permission, not a role name.
 
 ## Architecture at a glance
 
@@ -199,6 +231,27 @@ docs/ARCHITECTURE.md        architecture, data flows, data model, API reference
 
 ---
 
+## Public tracking (no login)
+
+Open <http://localhost:5173/track> and enter one of the seeded BRD numbers:
+
+| BRD | Project |
+|---|---|
+| `BRD-2026-0042` | Northwind Customer Portal — has a live bug loop |
+| `BRD-2026-0017` | Northwind ERP Rollout |
+| `BRD-2026-0031` | Acme Security Hardening |
+
+The response is built by **whitelist**, not by stripping fields: with no
+authenticated principal, a blacklist that someone forgets to update is a leak.
+The endpoint is rate-limited per IP, every lookup is written to the audit log,
+and an unknown BRD returns the same 404 as a malformed one so the endpoint
+cannot be used to enumerate valid numbers.
+
+> **Security note.** A BRD number is a bearer secret: anyone holding it can see
+> that project. That is what "no login required" means, and it is the brief's
+> choice rather than an oversight. If these projects were sensitive I would add
+> a second factor — an email-matched OTP, or a signed link with an expiry.
+
 ## Environment variables
 
 Both apps ship a `.env.example` documenting every variable, and both run with
@@ -235,8 +288,19 @@ cd server && npm test
 ✓ tests/rule5-sop-versioning.test.js      (7)   published versions frozen; projects pinned
 ✓ tests/rule7-project-generation.test.js  (7)   board generated in one transaction from published SOP
 ✓ tests/deactivation-reassign.test.js    (10)   409 → reassign → deactivate
+✓ tests/phase2-bug-loop.test.js           (8)   Testing cannot close with open bugs; legal transitions only
+✓ tests/phase2-stage-permissions.test.js  (5)   per-stage grants; same role, different actions per stage
+✓ tests/phase2-derived-status.test.js     (4)   status and % computed from stage rows
+✓ tests/phase2-public-brd.test.js         (5)   whitelist payload; unknown BRD indistinguishable
+✓ tests/phase2-platform.test.js           (7)   search scoping, role preview, reports, settings, notifications
                                           ───
-                                           55 passing
+                                           84 passing
 ```
 
 Each suite rebuilds its own database and reseeds it, so tests never interfere.
+
+Run the suite against the fallback database driver too:
+
+```bash
+DB_DRIVER=node-sqlite NODE_OPTIONS=--experimental-sqlite npm test
+```

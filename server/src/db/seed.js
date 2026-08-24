@@ -13,7 +13,14 @@ import { sopTemplateModel, sopVersionModel, sopStageModel } from '../models/sop.
 import { projectModel } from '../models/project.model.js';
 import { stageModel, statusHistoryModel, documentModel } from '../models/stage.model.js';
 import { auditModel } from '../models/audit.model.js';
-import { ROLES, SOP_VERSION_STATUS, STAGE_STATUS, AUDIT_ENTITY, AUDIT_ACTION } from '../config/constants.js';
+import { stagePermissionModel } from '../models/stagePermission.model.js';
+import { bugModel, bugEventModel } from '../models/bug.model.js';
+import { signoffModel } from '../models/signoff.model.js';
+import { systemSettingsModel } from '../models/settings.model.js';
+import {
+  ROLES, SOP_VERSION_STATUS, STAGE_STATUS, STAGE_TYPE, STAGE_ACTIONS,
+  BUG_STATUS, SIGNOFF_DECISION, AUDIT_ENTITY, AUDIT_ACTION,
+} from '../config/constants.js';
 
 const log = (...args) => console.log(...args);
 
@@ -62,6 +69,7 @@ function seedUsers(roles) {
     { email: 'client@itwf.dev',     fullName: 'Chris Okafor',   roleKey: ROLES.CLIENT,      team: null,
       clientName: 'Northwind Logistics' },
     { email: 'itmember2@itwf.dev',  fullName: 'Marco Bianchi',  roleKey: ROLES.IT_MEMBER,   team: 'Applications' },
+    { email: 'qa@itwf.dev',         fullName: 'Priya Nair',     roleKey: ROLES.IT_MEMBER,   team: 'Quality Assurance' },
   ];
 
   const users = {};
@@ -121,12 +129,80 @@ const SOP_STAGES = [
     description: 'Cutover, smoke tests and handover of runbooks to operations.',
     clientVisible: true,
     requiresDocument: true,
+    requiresSignoff: true,
     expectedDurationDays: 3,
     defaultOwnerTeam: 'Applications',
   },
 ];
 
-function seedSop(users) {
+const DELIVERY_SOP_STAGES = [
+  {
+    name: 'Solution Design',
+    description: 'Technical design, integration contracts and estimation.',
+    clientVisible: true, requiresDocument: true, requiresSignoff: true,
+    stageType: STAGE_TYPE.GENERIC, expectedDurationDays: 6, defaultOwnerTeam: 'Architecture',
+  },
+  {
+    name: 'Internal Risk & Compliance',
+    description: 'Data-protection review and internal compliance approval.',
+    clientVisible: false, requiresDocument: true,
+    stageType: STAGE_TYPE.GENERIC, expectedDurationDays: 3, defaultOwnerTeam: 'IT Governance',
+  },
+  {
+    name: 'Development',
+    description: 'Build the solution against the signed-off design.',
+    clientVisible: true, requiresDocument: false,
+    stageType: STAGE_TYPE.DEVELOPMENT, expectedDurationDays: 20, defaultOwnerTeam: 'Applications',
+  },
+  {
+    name: 'System Testing',
+    description: 'QA test cycles and defect resolution.',
+    clientVisible: true, requiresDocument: true, requiresSignoff: true,
+    stageType: STAGE_TYPE.TESTING, expectedDurationDays: 10, defaultOwnerTeam: 'Quality Assurance',
+  },
+  {
+    name: 'Commercial Reconciliation',
+    description: 'Change-request costing and internal margin sign-off.',
+    clientVisible: false, requiresDocument: true,
+    stageType: STAGE_TYPE.GENERIC, expectedDurationDays: 4, defaultOwnerTeam: 'PMO',
+  },
+  {
+    name: 'UAT & Go-Live',
+    description: 'User acceptance testing, cutover and handover.',
+    clientVisible: true, requiresDocument: true, requiresSignoff: true,
+    stageType: STAGE_TYPE.UAT, expectedDurationDays: 8, defaultOwnerTeam: 'Applications',
+  },
+];
+
+const A = STAGE_ACTIONS;
+const EVERYDAY = [A.VIEW, A.UPDATE_STATUS, A.UPLOAD_EVIDENCE];
+const STAGE_GRANTS = {
+  'Requirement Gathering':      { ADMIN: [A.VIEW, A.SIGNOFF], IT_MEMBER: EVERYDAY },
+  'Internal Security Review':   { ADMIN: [A.VIEW, A.SIGNOFF], IT_MEMBER: EVERYDAY },
+  'Environment Provisioning':   { ADMIN: [A.VIEW],            IT_MEMBER: EVERYDAY },
+  'Vendor Cost Negotiation':    { ADMIN: [A.VIEW, A.UPDATE_STATUS, A.SIGNOFF] },
+  'Go-Live & Handover':         { ADMIN: [A.VIEW, A.SIGNOFF], IT_MEMBER: EVERYDAY },
+
+  'Solution Design':            { ADMIN: [A.VIEW, A.SIGNOFF], IT_MEMBER: EVERYDAY },
+  'Internal Risk & Compliance': { ADMIN: [A.VIEW, A.UPDATE_STATUS, A.SIGNOFF] },
+  'Development':                { ADMIN: [A.VIEW],            IT_MEMBER: EVERYDAY },
+  'System Testing': {
+    ADMIN:     [A.VIEW, A.SIGNOFF, A.RAISE_BUG, A.CLOSE_BUG],
+    IT_MEMBER: [...EVERYDAY, A.RAISE_BUG, A.RESOLVE_BUG, A.CLOSE_BUG],
+  },
+  'Commercial Reconciliation':  { ADMIN: [A.VIEW, A.UPDATE_STATUS, A.SIGNOFF] },
+  'UAT & Go-Live':              { ADMIN: [A.VIEW, A.SIGNOFF], IT_MEMBER: EVERYDAY },
+};
+
+function grantsFor(stageName, roles) {
+  const grants = [];
+  for (const [roleKey, actions] of Object.entries(STAGE_GRANTS[stageName] ?? {})) {
+    for (const action of actions) grants.push({ roleId: roles[roleKey].id, action });
+  }
+  return grants;
+}
+
+function seedSop(users, roles) {
   const superAdmin = users['superadmin@itwf.dev'];
   const templateName = 'Standard IT Onboarding SOP';
 
@@ -152,9 +228,11 @@ function seedSop(users) {
       changeNote: 'Initial published baseline.',
     });
 
-    SOP_STAGES.forEach((stage, index) =>
-      sopStageModel.create({ ...stage, sopVersionId: draft.id, sequence: index + 1 }),
-    );
+    SOP_STAGES.forEach((stage, index) => {
+      const created = sopStageModel.create({ ...stage, sopVersionId: draft.id, sequence: index + 1 });
+      const grants = grantsFor(stage.name, roles);
+      if (grants.length) stagePermissionModel.setForSopStage(created.id, grants);
+    });
 
     const published = sopVersionModel.markPublished(draft.id, superAdmin.id);
 
@@ -195,6 +273,7 @@ function seedProjects(users, { template, publishedVersion }) {
       name: 'Northwind ERP Rollout',
       description: 'Full ERP migration for Northwind Logistics across three regions.',
       clientName: 'Northwind Logistics',
+      brdNumber: 'BRD-2026-0017',
       startDate: '2026-07-01',
       targetEndDate: '2026-12-15',
     },
@@ -203,6 +282,7 @@ function seedProjects(users, { template, publishedVersion }) {
       name: 'Acme Security Hardening',
       description: 'Zero-trust rollout and endpoint hardening for Acme Corp.',
       clientName: 'Acme Corp',
+      brdNumber: 'BRD-2026-0031',
       startDate: '2026-08-01',
       targetEndDate: '2027-01-31',
     },
@@ -319,15 +399,161 @@ function seedProjects(users, { template, publishedVersion }) {
   log(`  ✓ ${created.length} projects seeded with auto-generated boards`);
 }
 
-// Idempotent, so npm run dev can seed on every start.
+function seedDelivery(users, roles) {
+  const superAdmin = users['superadmin@itwf.dev'];
+  const admin = users['admin@itwf.dev'];
+  const qa = users['qa@itwf.dev'];
+  const dev = users['itmember2@itwf.dev'];
+  const templateName = 'Software Delivery SOP';
+
+  const existingTemplate = sopTemplateModel.list({ includeInactive: true }).find((t) => t.name === templateName);
+  if (existingTemplate) {
+    log('  ✓ Delivery SOP already seeded');
+    return;
+  }
+
+  const { template, published } = transaction(() => {
+    const tpl = sopTemplateModel.create({
+      name: templateName,
+      description: 'Design, build, test and release workflow for software change requests.',
+      category: 'Delivery',
+      createdBy: superAdmin.id,
+    });
+    const draft = sopVersionModel.create({
+      templateId: tpl.id, version: 1, status: SOP_VERSION_STATUS.DRAFT,
+      changeNote: 'Initial delivery baseline.',
+    });
+    DELIVERY_SOP_STAGES.forEach((stage, index) => {
+      const created = sopStageModel.create({ ...stage, sopVersionId: draft.id, sequence: index + 1 });
+      const grants = grantsFor(stage.name, roles);
+      if (grants.length) stagePermissionModel.setForSopStage(created.id, grants);
+    });
+    const pub = sopVersionModel.markPublished(draft.id, superAdmin.id);
+    const next = sopVersionModel.create({ templateId: tpl.id, version: 2, status: SOP_VERSION_STATUS.DRAFT });
+    sopStageModel.cloneInto(pub.id, next.id);
+    return { template: tpl, published: pub };
+  });
+
+  const visible = DELIVERY_SOP_STAGES.filter((s) => s.clientVisible).length;
+  log(`  ✓ SOP "${templateName}" v1 PUBLISHED — ${DELIVERY_SOP_STAGES.length} stages (${visible} client-visible, ${DELIVERY_SOP_STAGES.length - visible} hidden)`);
+
+  const project = transaction(() => {
+    const row = projectModel.create({
+      code: 'NWL-PORTAL-2026',
+      name: 'Northwind Customer Portal',
+      description: 'Self-service portal for Northwind Logistics customers.',
+      clientName: 'Northwind Logistics',
+      brdNumber: 'BRD-2026-0042',
+      sopTemplateId: template.id,
+      sopVersionId: published.id,
+      ownerId: dev.id,
+      startDate: '2026-06-15',
+      targetEndDate: '2026-11-30',
+      createdBy: admin.id,
+    });
+    const generated = stageModel.generateFromSopVersion(row.id, published.id);
+    stagePermissionModel.snapshotForProject(row.id);
+    projectModel.addMember(row.id, dev.id, 'OWNER');
+    projectModel.addMember(row.id, qa.id, 'MEMBER');
+    auditModel.append({
+      actorId: admin.id, actorEmail: admin.email, actorRole: ROLES.ADMIN,
+      entityType: AUDIT_ENTITY.PROJECT, entityId: row.id, action: AUDIT_ACTION.CREATE,
+      summary: `Project ${row.code} created from "${templateName}" v1 — ${generated} stages generated`,
+      newValue: { code: row.code, brdNumber: row.brdNumber, stagesGenerated: generated },
+    });
+    return row;
+  });
+
+  const stages = stageModel.listByProject(project.id);
+  const testing = stages.find((s) => s.stageType === STAGE_TYPE.TESTING);
+
+  transaction(() => {
+    for (const [index, status, extra] of [
+      [0, STAGE_STATUS.COMPLETED, { completionDate: '2026-07-04' }],
+      [1, STAGE_STATUS.COMPLETED, { completionDate: '2026-07-10' }],
+      [2, STAGE_STATUS.COMPLETED, { completionDate: '2026-09-19' }],
+    ]) {
+      const stage = stages[index];
+      stageModel.updateAssignment(stage.id, { assignedTo: dev.id, dueDate: null, updatedBy: admin.id });
+      if (stage.requiresSignoff) {
+        signoffModel.create({
+          projectStageId: stage.id, decision: SIGNOFF_DECISION.APPROVED,
+          note: 'Reviewed and approved.', signedBy: admin.id, signedRole: ROLES.ADMIN,
+        });
+      }
+      stageModel.applyStatusChange(stage.id, {
+        status, blocker: null, holdReason: null, completionDate: extra.completionDate,
+        remarks: null, updatedBy: dev.id, startedAt: new Date().toISOString(),
+      });
+      statusHistoryModel.append({
+        projectStageId: stage.id, fromStatus: STAGE_STATUS.NOT_STARTED, toStatus: status,
+        completionDate: extra.completionDate, changedBy: dev.id,
+      });
+    }
+
+    stageModel.updateAssignment(testing.id, { assignedTo: qa.id, dueDate: null, updatedBy: admin.id });
+    stageModel.applyStatusChange(testing.id, {
+      status: STAGE_STATUS.IN_PROGRESS, blocker: null, holdReason: null, completionDate: null,
+      remarks: 'Cycle 1 execution underway.', updatedBy: qa.id, startedAt: new Date().toISOString(),
+    });
+    statusHistoryModel.append({
+      projectStageId: testing.id, fromStatus: STAGE_STATUS.NOT_STARTED,
+      toStatus: STAGE_STATUS.IN_PROGRESS, changedBy: qa.id,
+    });
+
+    for (const spec of [
+      { title: 'Invoice PDF renders totals without tax', severity: 'HIGH', status: BUG_STATUS.OPEN,
+        description: 'Line totals exclude VAT on the downloadable invoice.' },
+      { title: 'Session drops after password reset', severity: 'CRITICAL', status: BUG_STATUS.FIXED,
+        description: 'User is logged out and cannot sign back in for ~30s.' },
+      { title: 'Sort order ignored on shipment list', severity: 'LOW', status: BUG_STATUS.CLOSED,
+        description: 'Column sort resets when paginating.' },
+    ]) {
+      const bug = bugModel.create({
+        projectId: project.id, projectStageId: testing.id,
+        reference: bugModel.nextReference(project.id),
+        title: spec.title, description: spec.description, severity: spec.severity,
+        raisedBy: qa.id, assignedTo: dev.id,
+      });
+      bugEventModel.append({ bugId: bug.id, fromStatus: null, toStatus: BUG_STATUS.OPEN, actorId: qa.id });
+      if (spec.status !== BUG_STATUS.OPEN) {
+        bugModel.applyTransition(bug.id, {
+          status: spec.status,
+          resolutionNote: spec.status === BUG_STATUS.CLOSED ? 'Verified in cycle 1.' : 'Patch deployed to QA.',
+        });
+        bugEventModel.append({
+          bugId: bug.id, fromStatus: BUG_STATUS.OPEN, toStatus: spec.status,
+          note: spec.status === BUG_STATUS.CLOSED ? 'Verified in cycle 1.' : 'Patch deployed to QA.',
+          actorId: spec.status === BUG_STATUS.CLOSED ? qa.id : dev.id,
+        });
+      }
+      auditModel.append({
+        actorId: qa.id, actorEmail: qa.email, actorRole: ROLES.IT_MEMBER,
+        entityType: AUDIT_ENTITY.BUG, entityId: bug.id, action: AUDIT_ACTION.BUG_RAISED,
+        summary: `${project.code} - ${bug.reference} raised against "${testing.name}": ${bug.title}`,
+      });
+    }
+
+    for (const stage of stages.slice(4)) {
+      stageModel.updateAssignment(stage.id, { assignedTo: dev.id, dueDate: null, updatedBy: admin.id });
+    }
+  });
+
+  const open = bugModel.openCountForStage(testing.id);
+  log(`  ✓ Project ${project.code} (BRD-2026-0042) — Testing stage blocked by ${open} open bug${open === 1 ? '' : 's'}`);
+}
+
 export function seed() {
   migrate({ silent: true });
 
   log('\n🌱 Seeding IT Workflow database…');
   const roles = seedRbac();
   const users = seedUsers(roles);
-  const sop = seedSop(users);
+  const sop = seedSop(users, roles);
   seedProjects(users, sop);
+  seedDelivery(users, roles);
+  systemSettingsModel.set('app.name', 'IT Workflow Management', users['superadmin@itwf.dev'].id);
+  systemSettingsModel.set('app.defaultStageSlaDays', '5', users['superadmin@itwf.dev'].id);
 
   const db = getDb();
   const count = (table) => db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get().n;
@@ -339,9 +565,11 @@ export function seed() {
   log('  │  Admin         admin@itwf.dev                           │');
   log('  │  IT Member     itmember@itwf.dev                        │');
   log('  │  IT Member 2   itmember2@itwf.dev                       │');
+  log('  │  QA            qa@itwf.dev                              │');
   log('  │  Client / Ops  client@itwf.dev                          │');
   log(`  │  Password      ${env.SEED_PASSWORD.padEnd(41)}│`);
   log('  └─────────────────────────────────────────────────────────┘');
+  log('  Public tracking (no login): BRD-2026-0017 · BRD-2026-0031 · BRD-2026-0042');
   log(`\n  rows: users=${count('users')} sop_stages=${count('sop_stages')} projects=${count('projects')} workflow_stages=${count('project_workflow_stages')} audit=${count('audit_logs')}\n`);
 }
 

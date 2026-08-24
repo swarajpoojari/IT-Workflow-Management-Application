@@ -6,6 +6,10 @@ import { auditModel } from '../../models/audit.model.js';
 import { ApiError } from '../../utils/ApiError.js';
 import { transaction } from '../../db/index.js';
 import { resolveScope, can } from '../../middleware/authorize.js';
+import { stagePermissionModel } from '../../models/stagePermission.model.js';
+import { bugModel } from '../../models/bug.model.js';
+import { signoffModel } from '../../models/signoff.model.js';
+import { projectProgress } from '../../services/projectStatus.service.js';
 import { MODULES, ACTIONS, AUDIT_ENTITY, AUDIT_ACTION } from '../../config/constants.js';
 
 export const projectsService = {
@@ -37,7 +41,9 @@ export const projectsService = {
 
     return {
       ...project,
-      progress: stageModel.progressFor(projectId, { clientVisibleOnly }),
+      // Derived from the stages the caller can see, never a stored field.
+      progress: projectProgress(project, { clientVisibleOnly }),
+      bugStats: user.isClientScope ? undefined : bugModel.stats(projectId),
       stages: withDetail,
       members: can(user, MODULES.PROJECTS, ACTIONS.ASSIGN) ? projectModel.members(projectId) : undefined,
       sopVersionLocked: true,
@@ -75,6 +81,9 @@ export const projectsService = {
     if (projectModel.findByCode(payload.code)) {
       throw ApiError.conflict(`Project code "${payload.code}" is already in use`, { field: 'code' }, 'DUPLICATE_CODE');
     }
+    if (payload.brdNumber && projectModel.findByBrd(payload.brdNumber)) {
+      throw ApiError.conflict(`BRD number "${payload.brdNumber}" is already in use`, { field: 'brdNumber' }, 'DUPLICATE_BRD');
+    }
 
     const sopVersion = sopVersionModel.findLatestPublished(template.id);
     if (!sopVersion) {
@@ -106,6 +115,10 @@ export const projectsService = {
           'EMPTY_SOP',
         );
       }
+
+      // Stage-level grants are snapshotted alongside the board, so re-publishing
+      // the SOP with different grants never widens access on a live project.
+      stagePermissionModel.snapshotForProject(project.id);
 
       if (payload.ownerId) projectModel.addMember(project.id, payload.ownerId, 'OWNER');
       for (const memberId of payload.memberIds ?? []) {
@@ -180,7 +193,8 @@ export const projectsService = {
       status: project.status,
       targetEndDate: project.targetEndDate,
       sopVersionNumber: project.sopVersionNumber,
-      progress: stageModel.progressFor(project.id, { clientVisibleOnly }),
+      brdNumber: project.brdNumber,
+      progress: projectProgress(project, { clientVisibleOnly }),
     }));
   },
 };

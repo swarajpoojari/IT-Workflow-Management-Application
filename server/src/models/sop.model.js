@@ -6,6 +6,7 @@ const castStage = (row) => {
   const out = camelize(row);
   out.clientVisible = Boolean(out.clientVisible);
   out.requiresDocument = Boolean(out.requiresDocument);
+  out.requiresSignoff = Boolean(out.requiresSignoff);
   return out;
 };
 
@@ -156,9 +157,9 @@ export const sopStageModel = {
       .prepare(
         `INSERT INTO sop_stages
            (sop_version_id, name, description, sequence, client_visible, requires_document,
-            expected_duration_days, default_owner_team)
+            stage_type, requires_signoff, expected_duration_days, default_owner_team)
          VALUES (@sopVersionId, @name, @description, @sequence, @clientVisible, @requiresDocument,
-                 @expectedDurationDays, @defaultOwnerTeam)`,
+                 @stageType, @requiresSignoff, @expectedDurationDays, @defaultOwnerTeam)`,
       )
       .run({
         sopVersionId: stage.sopVersionId,
@@ -167,6 +168,8 @@ export const sopStageModel = {
         sequence: stage.sequence,
         clientVisible: stage.clientVisible ? 1 : 0,
         requiresDocument: stage.requiresDocument ? 1 : 0,
+        stageType: stage.stageType ?? 'GENERIC',
+        requiresSignoff: stage.requiresSignoff ? 1 : 0,
         expectedDurationDays: stage.expectedDurationDays ?? null,
         defaultOwnerTeam: stage.defaultOwnerTeam ?? null,
       });
@@ -180,6 +183,8 @@ export const sopStageModel = {
       sequence: 'sequence',
       clientVisible: 'client_visible',
       requiresDocument: 'requires_document',
+      stageType: 'stage_type',
+      requiresSignoff: 'requires_signoff',
       expectedDurationDays: 'expected_duration_days',
       defaultOwnerTeam: 'default_owner_team',
     };
@@ -188,8 +193,9 @@ export const sopStageModel = {
     for (const [key, column] of Object.entries(columns)) {
       if (patch[key] !== undefined) {
         sets.push(`${column} = @${key}`);
-        params[key] =
-          key === 'clientVisible' || key === 'requiresDocument' ? (patch[key] ? 1 : 0) : patch[key];
+        params[key] = ['clientVisible', 'requiresDocument', 'requiresSignoff'].includes(key)
+          ? (patch[key] ? 1 : 0)
+          : patch[key];
       }
     }
     if (!sets.length) return sopStageModel.findById(id);
@@ -216,9 +222,9 @@ export const sopStageModel = {
       .prepare(
         `INSERT INTO sop_stages
            (sop_version_id, name, description, sequence, client_visible, requires_document,
-            expected_duration_days, default_owner_team)
+            stage_type, requires_signoff, expected_duration_days, default_owner_team)
          SELECT ?, name, description, sequence, client_visible, requires_document,
-                expected_duration_days, default_owner_team
+                stage_type, requires_signoff, expected_duration_days, default_owner_team
            FROM sop_stages WHERE sop_version_id = ? ORDER BY sequence`,
       )
       .run(toVersionId, fromVersionId);

@@ -52,6 +52,9 @@ export function StatusModal({ stage, onSubmit, onClose, busy }) {
   const conditionalValue = required ? values[required.field]?.trim?.() ?? values[required.field] : null;
   const conditionalOk = !required || (conditionalValue && String(conditionalValue).length >= (required.minLength ?? 1));
   const unchanged = status === stage.status && status !== 'BLOCKED';
+  // The server refuses COMPLETED while bugs are open or sign-off is missing.
+  // Disable it here too, with the reason, rather than letting the user take a 409.
+  const completionBlocked = status === 'COMPLETED' && stage.canComplete === false;
 
   const submit = (event) => {
     event.preventDefault();
@@ -69,13 +72,21 @@ export function StatusModal({ stage, onSubmit, onClose, busy }) {
       footer={
         <>
           <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
-          <button type="submit" form="status-form" className="btn" disabled={busy || !conditionalOk || unchanged}>
+          <button
+            type="submit" form="status-form" className="btn"
+            disabled={busy || !conditionalOk || unchanged || completionBlocked}
+          >
             {busy ? 'Saving…' : 'Update status'}
           </button>
         </>
       }
     >
       <form id="status-form" onSubmit={submit}>
+        {completionBlocked && (
+          <div className="callout warn" style={{ marginBottom: 12 }}>
+            This stage cannot be completed yet — close every open bug and obtain an approved sign-off first.
+          </div>
+        )}
         <div className="row" style={{ marginBottom: 16 }}>
           <span className="muted" style={{ fontSize: 13 }}>Current:</span>
           <StatusBadge status={stage.status} />

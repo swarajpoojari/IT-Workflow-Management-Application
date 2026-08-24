@@ -7,6 +7,23 @@ import { getDb, closeDb } from './index.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
+const ADDED_COLUMNS = [
+  ['projects', 'brd_number', 'TEXT'],
+  ['sop_stages', 'stage_type', "TEXT NOT NULL DEFAULT 'GENERIC'"],
+  ['sop_stages', 'requires_signoff', 'INTEGER NOT NULL DEFAULT 0'],
+  ['project_workflow_stages', 'stage_type', "TEXT NOT NULL DEFAULT 'GENERIC'"],
+  ['project_workflow_stages', 'requires_signoff', 'INTEGER NOT NULL DEFAULT 0'],
+];
+
+function syncColumns(db) {
+  for (const [table, column, definition] of ADDED_COLUMNS) {
+    const existing = db.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name);
+    if (!existing.includes(column)) {
+      db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+    }
+  }
+}
+
 export function migrate({ fresh = false, silent = false } = {}) {
   if (fresh) {
     for (const suffix of ['', '-wal', '-shm']) {
@@ -19,6 +36,7 @@ export function migrate({ fresh = false, silent = false } = {}) {
   const sql = fs.readFileSync(path.join(here, 'schema.sql'), 'utf-8');
   const db = getDb();
   db.exec(sql);
+  syncColumns(db);
 
   if (!silent) {
     const tables = db

@@ -74,7 +74,32 @@ export const addDocument = createAsyncThunk(
   },
 );
 
+export const fetchStageDetail = createAsyncThunk(
+  'stages/detail',
+  async ({ projectId, stageId }, { rejectWithValue }) => {
+    try {
+      return (await api.get(endpoints.projects.stageDetail(projectId, stageId))).data;
+    } catch (error) {
+      return rejectWithValue(toRejection(error));
+    }
+  },
+);
+
+export const recordSignoff = createAsyncThunk(
+  'stages/signoff',
+  async ({ projectId, stageId, payload }, { rejectWithValue }) => {
+    try {
+      return (await api.post(endpoints.projects.stageSignoff(projectId, stageId), payload)).data;
+    } catch (error) {
+      return rejectWithValue(toRejection(error));
+    }
+  },
+);
+
 const initialState = {
+  detail: null,
+  detailStatus: 'idle',
+  signingOff: false,
   pendingRollback: {},
   updatingStageId: null,
   history: {},
@@ -91,6 +116,34 @@ const stagesSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
+      .addCase(fetchStageDetail.pending, (state) => { state.detailStatus = 'loading'; })
+      .addCase(fetchStageDetail.fulfilled, (state, action) => {
+        state.detailStatus = 'succeeded';
+        state.detail = action.payload;
+      })
+      .addCase(fetchStageDetail.rejected, (state, action) => {
+        state.detailStatus = 'failed';
+        state.error = action.payload;
+      })
+      .addCase(recordSignoff.pending, (state) => { state.signingOff = true; state.error = null; })
+      .addCase(recordSignoff.fulfilled, (state, action) => {
+        state.signingOff = false;
+        if (state.detail) {
+          state.detail.signoffs = action.payload.signoffs;
+          const latest = action.payload.signoff;
+          // Recompute the gate locally so Complete re-enables without a refetch.
+          state.detail.completionBlockers = {
+            ...state.detail.completionBlockers,
+            signoffDecision: latest.decision,
+            canComplete:
+              state.detail.completionBlockers.openBugs === 0 &&
+              (!state.detail.completionBlockers.signoffRequired || latest.decision === 'APPROVED'),
+          };
+        }
+      })
+      .addCase(recordSignoff.rejected, (state, action) => {
+        state.signingOff = false; state.error = action.payload;
+      })
       .addCase(updateStageStatus.pending, (state, action) => {
         const { stageId, payload, snapshot } = action.meta.arg;
         state.updatingStageId = stageId;

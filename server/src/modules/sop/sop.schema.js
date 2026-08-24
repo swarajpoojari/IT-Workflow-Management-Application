@@ -21,6 +21,9 @@ export const createStageSchema = z.object({
   description: z.string().trim().max(1000).optional().nullable(),
   clientVisible: z.boolean().default(true),
   requiresDocument: z.boolean().default(false),
+  // TESTING stages carry the bug loop and cannot close with bugs open.
+  stageType: z.enum(['GENERIC', 'DEVELOPMENT', 'TESTING', 'UAT']).default('GENERIC'),
+  requiresSignoff: z.boolean().default(false),
   expectedDurationDays: z.coerce.number().int().min(0).max(3650).optional().nullable(),
   defaultOwnerTeam: z.string().trim().max(80).optional().nullable(),
 });

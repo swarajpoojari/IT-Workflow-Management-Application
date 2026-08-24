@@ -5,6 +5,7 @@ const cast = (row) => {
   const out = camelize(row);
   out.clientVisible = Boolean(out.clientVisible);
   out.requiresDocument = Boolean(out.requiresDocument);
+  out.requiresSignoff = Boolean(out.requiresSignoff);
   return out;
 };
 
@@ -33,9 +34,9 @@ export const stageModel = {
       .prepare(
         `INSERT INTO project_workflow_stages
            (project_id, sop_stage_id, name, description, sequence, client_visible,
-            requires_document, status, due_date)
+            requires_document, stage_type, requires_signoff, status, due_date)
          SELECT ?, ss.id, ss.name, ss.description, ss.sequence, ss.client_visible,
-                ss.requires_document, 'NOT_STARTED', NULL
+                ss.requires_document, ss.stage_type, ss.requires_signoff, 'NOT_STARTED', NULL
            FROM sop_stages ss
           WHERE ss.sop_version_id = ?
           ORDER BY ss.sequence`,

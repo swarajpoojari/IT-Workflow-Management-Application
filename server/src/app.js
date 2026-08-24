@@ -18,6 +18,12 @@ import roleRoutes from './modules/roles/roles.routes.js';
 import sopRoutes from './modules/sop/sop.routes.js';
 import projectRoutes from './modules/projects/projects.routes.js';
 import auditRoutes from './modules/audit/audit.routes.js';
+import publicRoutes from './modules/public/public.routes.js';
+import notificationRoutes from './modules/platform/notifications.routes.js';
+import settingsRoutes from './modules/platform/settings.routes.js';
+import reportRoutes from './modules/platform/reports.routes.js';
+import searchRoutes from './modules/platform/search.routes.js';
+import rolePreviewRoutes from './modules/platform/rolePreview.routes.js';
 
 export function createApp() {
   const app = express();
@@ -49,12 +55,21 @@ export function createApp() {
 
   app.use(filterClientData);
 
+  // Unauthenticated, mounted before the authenticated routers. Its own
+  // rate limit and whitelist live in modules/public.
+  app.use('/api/public', publicRoutes);
+
   app.use('/api/auth', authRoutes);
   app.use('/api/users', userRoutes);
   app.use('/api/roles', roleRoutes);
   app.use('/api/sop', sopRoutes);
   app.use('/api/projects', projectRoutes);
   app.use('/api/audit', auditRoutes);
+  app.use('/api/notifications', notificationRoutes);
+  app.use('/api/settings', settingsRoutes);
+  app.use('/api/reports', reportRoutes);
+  app.use('/api/search', searchRoutes);
+  app.use('/api/roles', rolePreviewRoutes);
 
   app.get(
     '/api/me/assignments',

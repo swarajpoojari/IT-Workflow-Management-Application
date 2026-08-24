@@ -33,6 +33,13 @@ export const PERMISSION_CATALOG = [
 
   [M.AUDIT,     A.READ,          'Read the append-only audit log'],
 
+  [M.BUGS,      A.READ,          'View bugs raised during testing'],
+  [M.BUGS,      A.CREATE,        'Raise a bug against a testing stage'],
+  [M.BUGS,      A.UPDATE,        'Move a bug through the resolution loop'],
+
+  [M.SETTINGS,  A.READ,          'View system settings'],
+  [M.SETTINGS,  A.UPDATE,        'Change system settings'],
+
   [M.REPORTS,   A.READ,          'View reports and dashboards'],
 ];
 
@@ -59,6 +66,8 @@ export const ROLE_MATRIX = {
       [M.DOCUMENTS, A.READ],
       [M.AUDIT, A.READ],
       [M.REPORTS, A.READ],
+      [M.BUGS, A.READ], [M.BUGS, A.CREATE], [M.BUGS, A.UPDATE],
+      [M.SETTINGS, A.READ],
     ],
   },
 
@@ -71,6 +80,8 @@ export const ROLE_MATRIX = {
       [M.SOP, A.READ],
       [M.STAGES, A.READ], [M.STAGES, A.UPDATE_STATUS],
       [M.DOCUMENTS, A.READ], [M.DOCUMENTS, A.CREATE],
+      [M.BUGS, A.READ], [M.BUGS, A.CREATE], [M.BUGS, A.UPDATE],
+      [M.REPORTS, A.READ],
     ],
   },
 

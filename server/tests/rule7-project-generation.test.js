@@ -8,7 +8,7 @@ describe('Rule 7 · workflow stages are auto-generated on project creation', () 
     app = freshApp();
     admin = await login(app, 'admin');
     su = await login(app, 'superAdmin');
-    templateId = (await as(app, admin.token).get('/api/sop')).body.templates[0].id;
+    templateId = (await as(app, admin.token).get('/api/sop')).body.templates.find((t) => t.name === 'Standard IT Onboarding SOP').id;
   });
 
   it('preview shows exactly what creation will generate', async () => {

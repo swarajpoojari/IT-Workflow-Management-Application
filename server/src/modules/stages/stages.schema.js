@@ -10,7 +10,6 @@ export const projectParam = z.object({ projectId: z.coerce.number().int().positi
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD');
 
-// Discriminated union: which fields are required depends on the target status.
 export const updateStatusSchema = z
   .discriminatedUnion('status', [
     z.object({

@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { logout, selectUser } from '../features/auth/authSlice.js';
 import { usePermissionChecker } from '../hooks/usePermission.js';
 import { Toasts } from './Toasts.jsx';
+import { TopBar } from './TopBar.jsx';
 
 const NAV = [
   { to: '/',           label: 'Dashboard',       icon: '▦' },
@@ -10,7 +11,10 @@ const NAV = [
   { to: '/my-work',    label: 'My Work',         icon: '✦', require: ['stages', 'update_status'] },
   { to: '/sop',        label: 'SOP Builder',     icon: '⛭', require: ['sop', 'update'] },
   { to: '/users',      label: 'User Management', icon: '☰', require: ['users', 'read'] },
+  { to: '/reports',    label: 'Reports',         icon: '◑', require: ['reports', 'read'] },
+  { to: '/roles',      label: 'Roles',           icon: '⚿', require: ['roles', 'read'] },
   { to: '/audit',      label: 'Audit Log',       icon: '⏱', require: ['audit', 'read'] },
+  { to: '/settings',   label: 'Settings',        icon: '⚙' },
 ];
 
 export function Layout() {
@@ -65,9 +69,12 @@ export function Layout() {
         </div>
       </aside>
 
-      <main className="content">
-        <Outlet />
-      </main>
+      <div className="main-column">
+        <TopBar />
+        <main className="content">
+          <Outlet />
+        </main>
+      </div>
 
       <Toasts />
     </div>

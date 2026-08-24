@@ -19,6 +19,10 @@ export const projectModel = {
     return cast(getDb().prepare(`${SELECT_PROJECT} WHERE p.id = ?`).get(id));
   },
 
+  findByBrd(brdNumber) {
+    return cast(getDb().prepare(`${SELECT_PROJECT} WHERE p.brd_number = ?`).get(brdNumber));
+  },
+
   findByCode(code) {
     return cast(getDb().prepare(`${SELECT_PROJECT} WHERE p.code = ?`).get(code));
   },
@@ -96,9 +100,9 @@ export const projectModel = {
     const info = getDb()
       .prepare(
         `INSERT INTO projects
-           (code, name, description, client_name, sop_template_id, sop_version_id,
+           (code, name, description, client_name, brd_number, sop_template_id, sop_version_id,
             owner_id, status, start_date, target_end_date, created_by)
-         VALUES (@code, @name, @description, @clientName, @sopTemplateId, @sopVersionId,
+         VALUES (@code, @name, @description, @clientName, @brdNumber, @sopTemplateId, @sopVersionId,
                  @ownerId, @status, @startDate, @targetEndDate, @createdBy)`,
       )
       .run({
@@ -106,6 +110,7 @@ export const projectModel = {
         name: project.name,
         description: project.description ?? null,
         clientName: project.clientName,
+        brdNumber: project.brdNumber ?? null,
         sopTemplateId: project.sopTemplateId,
         sopVersionId: project.sopVersionId,
         ownerId: project.ownerId ?? null,
@@ -123,6 +128,7 @@ export const projectModel = {
       name: 'name',
       description: 'description',
       clientName: 'client_name',
+      brdNumber: 'brd_number',
       ownerId: 'owner_id',
       status: 'status',
       startDate: 'start_date',

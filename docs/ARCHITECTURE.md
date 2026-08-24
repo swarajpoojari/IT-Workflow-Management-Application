@@ -17,7 +17,8 @@ the data model, and the API contracts.
 7. [Frontend architecture](#7-frontend-architecture)
 8. [API reference](#8-api-reference)
 9. [Error model](#9-error-model)
-10. [What I would do next](#10-what-i-would-do-next)
+10. [Phase 2 — the project working area](#10-phase-2--the-project-working-area)
+11. [What I would do next](#11-what-i-would-do-next)
 
 ---
 
@@ -827,7 +828,164 @@ SQL and file paths never reach a browser.
 
 ---
 
-## 10. What I would do next
+## 10. Phase 2 — the project working area
+
+### The Project screen
+
+Five tabs over one loaded project:
+
+| Tab | Contents |
+|---|---|
+| **Overview** | Project fields as a labelled grid, plus derived status, completion %, progress bar and per-stage statuses |
+| **Assign** | Stage owner and due date per row. The schema has no `status` key, so assignment is structurally incapable of moving a stage |
+| **Workflow** | The journey. Each stage opens a drawer |
+| **Team** | Project membership with role-on-project |
+| **Documents** | Every document across every stage, linking back to its stage |
+
+The drawer is the working area: **Status · Evidence · Sign-off · Bugs · History**.
+The Bugs tab appears only for a `TESTING` stage. One request
+(`GET /api/projects/:id/stages/:stageId`) returns everything it needs, including
+the caller's stage-level permissions and a `completionBlockers` object — so the
+UI can disable *Complete* **and say why**, rather than letting the user submit
+and take a 409.
+
+### Derived project status
+
+`server/src/services/projectStatus.service.js` is a pure function of the stage
+rows:
+
+```
+every stage COMPLETED   → COMPLETED
+any stage BLOCKED       → AT_RISK
+any stage ON_HOLD       → ON_HOLD
+nothing started         → NOT_STARTED
+otherwise               → IN_PROGRESS
+```
+
+An explicit administrative `CANCELLED` or `ON_HOLD` on the project outranks the
+computed value; nothing else can. Because the same function takes
+`clientVisibleOnly`, a client's percentage is computed over the stages they can
+see — their 50% and an admin's 50% can legitimately differ, and neither leaks
+the other's denominator.
+
+### Stage-level permissions
+
+Module-level RBAC answers "may this role touch stages at all?". Stage-level
+permissions answer "may this role do *this* on *that* stage?".
+
+```
+sop_stage_permissions (sop_stage_id, role_id, action)
+        │  snapshotted at project creation
+        ▼
+project_stage_permissions (project_stage_id, role_id, action)
+```
+
+Actions: `view`, `update_status`, `upload_evidence`, `signoff`, `raise_bug`,
+`resolve_bug`, `close_bug`.
+
+The snapshot is the point. Grants are copied onto the project's own rows inside
+the creation transaction, so re-publishing the SOP with wider grants never
+widens access on a project that is already running — the same reasoning that
+pins `sop_version_id`.
+
+Resolution order in `middleware/stagePermission.js`:
+
+1. a `project_stage_permissions` row grants the caller's role that action
+2. the caller is the stage assignee or the project owner → they keep the
+   everyday actions, otherwise a stage could be assigned to someone unable to
+   touch it
+3. the caller holds `projects:read_all` → administrator, unrestricted
+
+### The QA ↔ Development bug loop
+
+```
+        QA raises
+           │
+           ▼
+        ┌──────┐   dev picks up   ┌─────────────┐   dev fixes   ┌───────┐
+        │ OPEN │ ───────────────► │ IN_PROGRESS │ ────────────► │ FIXED │
+        └──────┘                  └─────────────┘               └───┬───┘
+                                        ▲                           │ QA verifies
+                            QA rejects  │                           ▼
+                             the fix    │                      ┌────────┐
+                        ┌───────────────┴──────────────────────│ RETEST │
+                        │  REOPENED (reopen_count++)           └───┬────┘
+                        └──────────────────────────────────────────┤
+                                                                   ▼
+                                                              ┌────────┐
+                                                              │ CLOSED │ terminal
+                                                              └────────┘
+```
+
+`BUG_TRANSITIONS` in `config/constants.js` is the authority. An illegal jump is
+rejected with the allowed set rather than silently applied, and `CLOSED` has no
+successors. Which side of the loop a caller is on is decided by stage-level
+permissions (`resolve_bug` vs `close_bug`), not by role name — so a QA role on
+one project and a developer role on another need no code change.
+
+Every transition writes an append-only `bug_events` row and an audit row in the
+same transaction.
+
+### The two completion gates
+
+`assertCompletionAllowed()` runs before any write when a stage moves to
+`COMPLETED`:
+
+- **Open bugs** — a `TESTING` stage counts rows in `bugs` where the status is
+  not `CLOSED`. It counts rather than trusting a cached flag, so it cannot
+  drift. Refusal is `409 OPEN_BUGS_BLOCK_COMPLETION` with the blocking bugs
+  listed.
+- **Sign-off** — a stage flagged `requires_signoff` needs its *latest* decision
+  to be `APPROVED`. Latest rather than "any approval", so a later rejection
+  genuinely re-blocks. Refusal is `409 SIGNOFF_REQUIRED`.
+
+### Public BRD tracking
+
+The only unauthenticated data route. With no principal to filter against, the
+response is built by **whitelist** — a blacklist has to be updated every time a
+column is added, and this endpoint is reachable by the whole internet.
+
+```
+GET /api/public/track?brd=BRD-2026-0042
+  → { project: { brdNumber, name, clientName, status, startDate,
+                 targetEndDate, owner },
+      progress: { total, completed, percentComplete },
+      stages: [ { name, description, sequence, status,
+                  dueDate, startedAt, completionDate } ] }
+```
+
+Hidden stages are excluded in SQL, so they are never loaded. Rate-limited per
+IP, every lookup audited with actor `PUBLIC`, and an unknown BRD returns the
+same 404 as a malformed one so the endpoint cannot enumerate valid numbers.
+
+A BRD number is a bearer secret — anyone holding it sees that project. That is
+what "no login" means, and it is the brief's tradeoff. A production system
+handling sensitive engagements would want a second factor.
+
+### Role preview
+
+`GET /api/roles/:id/preview` returns another role's effective permissions,
+resulting navigation and capability summary — as **data**. It grants nothing:
+the caller's token is unchanged and every subsequent request is still
+authorised against their real role. Anything else would be a privilege-
+escalation endpoint with a friendly name.
+
+### Notifications, search, reports, settings
+
+- **Notifications** are generated in-process on assignment, bug events and
+  sign-off decisions. Every query is scoped to `req.user.id`, so there is no
+  permission to check and no way to read another tray. Per-user preferences can
+  silence a category. Delivery never throws: a failed notification must not roll
+  back the business change that triggered it.
+- **Search** gates each result bucket by the permission that governs it and runs
+  project rows through the same scope filter as the project list, so it can
+  never surface something the caller could not open.
+- **Reports** aggregate only over projects in scope.
+- **Settings** are per-user (theme, density, notification preferences) plus a
+  permission-gated system table. Theme is applied to `<html data-theme>` before
+  first paint, so a dark-mode user never sees a light flash.
+
+## 11. What I would do next
 
 Honest scope notes — deliberate omissions, not oversights.
 

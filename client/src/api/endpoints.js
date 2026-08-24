@@ -38,6 +38,13 @@ export const endpoints = {
     stageAssign: (id, stageId) => `/projects/${id}/stages/${stageId}/assign`,
     stageHistory: (id, stageId) => `/projects/${id}/stages/${stageId}/status-history`,
     stageDocuments: (id, stageId) => `/projects/${id}/stages/${stageId}/documents`,
+    stageDetail: (id, stageId) => `/projects/${id}/stages/${stageId}`,
+    stageSignoff: (id, stageId) => `/projects/${id}/stages/${stageId}/signoff`,
+    stagePermissions: (id, stageId) => `/projects/${id}/stages/${stageId}/permissions`,
+    stageBugs: (id, stageId) => `/projects/${id}/stages/${stageId}/bugs`,
+    bugs: (id) => `/projects/${id}/bugs`,
+    bug: (id, bugId) => `/projects/${id}/bugs/${bugId}`,
+    bugStatus: (id, bugId) => `/projects/${id}/bugs/${bugId}/status`,
   },
   audit: {
     root: '/audit',
@@ -46,4 +53,17 @@ export const endpoints = {
   me: {
     assignments: '/me/assignments',
   },
+  notifications: {
+    root: '/notifications',
+    read: (id) => `/notifications/${id}/read`,
+    readAll: '/notifications/read-all',
+  },
+  settings: {
+    me: '/settings/me',
+    system: '/settings/system',
+  },
+  reports: { root: '/reports' },
+  search: { root: (q) => `/search?q=${encodeURIComponent(q)}` },
+  rolePreview: (id) => `/roles/${id}/preview`,
+  public: { track: (brd) => `/public/track?brd=${encodeURIComponent(brd)}` },
 };

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { projectsService } from './projects.service.js';
 import stagesRouter from '../stages/stages.routes.js';
+import bugsRouter from '../bugs/bugs.routes.js';
 import { authenticate } from '../../middleware/authenticate.js';
 import { requirePermission } from '../../middleware/authorize.js';
 import { validate } from '../../middleware/validate.js';
@@ -122,5 +123,6 @@ router.delete(
 );
 
 router.use('/:projectId/stages', stagesRouter);
+router.use('/:projectId', bugsRouter);
 
 export default router;

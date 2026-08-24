@@ -1,4 +1,3 @@
-// Role keys are for seeding and tests only; authorisation reads permission rows.
 export const ROLES = {
   SUPER_ADMIN: 'SUPER_ADMIN',
   ADMIN: 'ADMIN',
@@ -16,6 +15,63 @@ export const MODULES = {
   DOCUMENTS: 'documents',
   AUDIT: 'audit',
   REPORTS: 'reports',
+  BUGS: 'bugs',
+  SETTINGS: 'settings',
+  NOTIFICATIONS: 'notifications',
+};
+
+export const STAGE_TYPE = {
+  GENERIC: 'GENERIC',
+  DEVELOPMENT: 'DEVELOPMENT',
+  TESTING: 'TESTING',
+  UAT: 'UAT',
+};
+
+// Granted per stage, not per module. See middleware/stagePermission.js.
+export const STAGE_ACTIONS = {
+  VIEW: 'view',
+  UPDATE_STATUS: 'update_status',
+  UPLOAD_EVIDENCE: 'upload_evidence',
+  SIGNOFF: 'signoff',
+  RAISE_BUG: 'raise_bug',
+  RESOLVE_BUG: 'resolve_bug',
+  CLOSE_BUG: 'close_bug',
+};
+
+export const BUG_STATUS = {
+  OPEN: 'OPEN',
+  IN_PROGRESS: 'IN_PROGRESS',
+  FIXED: 'FIXED',
+  RETEST: 'RETEST',
+  CLOSED: 'CLOSED',
+  REOPENED: 'REOPENED',
+};
+
+// Anything not CLOSED blocks a TESTING stage from completing.
+export const OPEN_BUG_STATUSES = ['OPEN', 'IN_PROGRESS', 'FIXED', 'RETEST', 'REOPENED'];
+
+// The authority on legal moves. CLOSED is terminal.
+export const BUG_TRANSITIONS = {
+  OPEN:        ['IN_PROGRESS', 'FIXED', 'CLOSED'],
+  IN_PROGRESS: ['FIXED', 'OPEN'],
+  FIXED:       ['RETEST', 'REOPENED', 'CLOSED'],
+  RETEST:      ['CLOSED', 'REOPENED'],
+  REOPENED:    ['IN_PROGRESS', 'FIXED'],
+  CLOSED:      [],
+};
+
+export const BUG_SEVERITY = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
+
+export const SIGNOFF_DECISION = { APPROVED: 'APPROVED', REJECTED: 'REJECTED' };
+
+export const NOTIFICATION_TYPE = {
+  STAGE_ASSIGNED: 'STAGE_ASSIGNED',
+  STAGE_STATUS: 'STAGE_STATUS',
+  BUG_ASSIGNED: 'BUG_ASSIGNED',
+  BUG_RAISED: 'BUG_RAISED',
+  BUG_STATUS: 'BUG_STATUS',
+  SIGNOFF_RECORDED: 'SIGNOFF_RECORDED',
+  REASSIGNED: 'REASSIGNED',
 };
 
 export const ACTIONS = {
@@ -30,6 +86,7 @@ export const ACTIONS = {
   DEACTIVATE: 'deactivate',
   REASSIGN: 'reassign',
   UPDATE_STATUS: 'update_status',
+  PREVIEW: 'preview',
 };
 
 export const STAGE_STATUS = {
@@ -42,7 +99,6 @@ export const STAGE_STATUS = {
 
 export const STAGE_STATUSES = Object.values(STAGE_STATUS);
 
-// Which field a status change must supply. Mirrored by the client's status modal.
 export const STATUS_REQUIRED_FIELDS = {
   [STAGE_STATUS.NOT_STARTED]: [],
   [STAGE_STATUS.IN_PROGRESS]: [],
@@ -71,6 +127,14 @@ export const PROJECT_STATUS = {
   CANCELLED: 'CANCELLED',
 };
 
+export const PROJECT_STATUS_DERIVED = {
+  NOT_STARTED: 'NOT_STARTED',
+  IN_PROGRESS: 'IN_PROGRESS',
+  AT_RISK: 'AT_RISK',
+  ON_HOLD: 'ON_HOLD',
+  COMPLETED: 'COMPLETED',
+};
+
 export const AUDIT_ENTITY = {
   USER: 'USER',
   ROLE: 'ROLE',
@@ -81,6 +145,10 @@ export const AUDIT_ENTITY = {
   PROJECT_STAGE: 'PROJECT_STAGE',
   DOCUMENT: 'DOCUMENT',
   AUTH: 'AUTH',
+  BUG: 'BUG',
+  SIGNOFF: 'SIGNOFF',
+  SETTINGS: 'SETTINGS',
+  BRD_LOOKUP: 'BRD_LOOKUP',
 };
 
 export const AUDIT_ACTION = {
@@ -97,9 +165,12 @@ export const AUDIT_ACTION = {
   LOGIN: 'LOGIN',
   LOGOUT: 'LOGOUT',
   UPLOAD: 'UPLOAD',
+  SIGNOFF: 'SIGNOFF',
+  BUG_RAISED: 'BUG_RAISED',
+  BUG_STATUS: 'BUG_STATUS',
+  VIEW: 'VIEW',
 };
 
-// Stripped from every response to a client-scoped role.
 export const CLIENT_RESTRICTED_FIELDS = [
   'documents',
   'documentCount',

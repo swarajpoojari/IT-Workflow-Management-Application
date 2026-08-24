@@ -9,7 +9,7 @@ describe('Rule 5 · SOP version protection', () => {
     su = await login(app, 'superAdmin');
     admin = await login(app, 'admin');
     project = await seededProject(app, admin.token);
-    templateId = (await as(app, su.token).get('/api/sop')).body.templates[0].id;
+    templateId = (await as(app, su.token).get('/api/sop')).body.templates.find((t) => t.name === 'Standard IT Onboarding SOP').id;
   });
 
   it('a published version is immutable — its stages cannot be edited', async () => {

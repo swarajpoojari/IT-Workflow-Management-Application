@@ -33,7 +33,7 @@ describe('DB-driven RBAC', () => {
     const admin = await login(app, 'admin');
     const before = await as(app, admin.token).get('/api/sop');
     expect(before.status).toBe(200);
-    const templateId = before.body.templates[0].id;
+    const templateId = before.body.templates.find((t) => t.name === 'Standard IT Onboarding SOP').id;
     expect((await as(app, admin.token).post(`/api/sop/${templateId}/publish`).send({})).status).toBe(403);
 
     const updated = await as(app, su.token)
