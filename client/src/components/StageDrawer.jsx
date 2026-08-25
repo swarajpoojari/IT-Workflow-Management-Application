@@ -5,8 +5,8 @@ import { fetchStageBugs, raiseBug, transitionBug } from '../features/bugs/bugsSl
 import { StatusModal } from './StatusModal.jsx';
 import { Badge, ErrorNote, Field, Spinner, StatusBadge } from './ui/Bits.jsx';
 
-const SEVERITY_TONE = { LOW: 'neutral', MEDIUM: 'info', HIGH: 'warn', CRITICAL: 'danger' };
-const BUG_TONE = { OPEN: 'danger', REOPENED: 'danger', IN_PROGRESS: 'warn', FIXED: 'info', RETEST: 'info', CLOSED: 'success' };
+const SEVERITY_TONE = { LOW: 'neutral', MEDIUM: 'accent', HIGH: 'amber', CRITICAL: 'red' };
+const BUG_TONE = { OPEN: 'red', REOPENED: 'red', IN_PROGRESS: 'amber', FIXED: 'accent', RETEST: 'accent', CLOSED: 'green' };
 
 // Mirrors the server's BUG_TRANSITIONS; only decides which buttons to show.
 const NEXT_STATUSES = {
@@ -61,7 +61,7 @@ function RaiseBugForm({ projectId, stageId, onDone }) {
           {['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
       </Field>
-      <button className="btn primary" type="submit" disabled={saving}>
+      <button className="btn" type="submit" disabled={saving}>
         {saving ? 'Raising…' : 'Raise bug'}
       </button>
     </form>
@@ -116,10 +116,10 @@ function BugCard({ bug, projectId, stageId, canResolve, canClose }) {
               value={note} onChange={(e) => setNote(e.target.value)}
             />
           )}
-          <div className="row gap-sm wrap">
+          <div className="row gap-sm">
             {allowed.map((next) => (
               <button
-                key={next} type="button" className="btn tiny" disabled={saving}
+                key={next} type="button" className="btn btn-ghost btn-sm" disabled={saving}
                 onClick={() => move(next)}
               >
                 → {next.replace('_', ' ').toLowerCase()}
@@ -206,11 +206,11 @@ export function StageDrawer({ projectId, stageId, onClose }) {
           <div className="row gap-sm">
             <StatusBadge status={stage.status} />
             {!stage.clientVisible && <Badge tone="neutral">Internal</Badge>}
-            {stage.requiresSignoff && <Badge tone="info">Sign-off required</Badge>}
-            {isTesting && liveOpenCount > 0 && <Badge tone="danger">{liveOpenCount} open</Badge>}
+            {stage.requiresSignoff && <Badge tone="accent">Sign-off required</Badge>}
+            {isTesting && liveOpenCount > 0 && <Badge tone="red">{liveOpenCount} open</Badge>}
           </div>
         </div>
-        <button className="btn ghost" type="button" onClick={onClose} aria-label="Close">✕</button>
+        <button className="btn btn-ghost" type="button" onClick={onClose} aria-label="Close">✕</button>
       </header>
 
       {stage.description && <p className="muted small drawer-desc">{stage.description}</p>}
@@ -255,7 +255,7 @@ export function StageDrawer({ projectId, stageId, onClose }) {
             {stage.remarks && <p className="muted small">{stage.remarks}</p>}
 
             {may('update_status') ? (
-              <button className="btn primary" type="button" onClick={() => setStatusModal(true)}>
+              <button className="btn" type="button" onClick={() => setStatusModal(true)}>
                 Update status
               </button>
             ) : (
@@ -273,7 +273,7 @@ export function StageDrawer({ projectId, stageId, onClose }) {
                   <strong>{doc.fileName}</strong> <Badge tone="neutral">v{doc.version}</Badge>
                   <p className="muted xsmall">{doc.uploadedByName} · {doc.uploadedAt?.slice(0, 10)}</p>
                 </div>
-                <a className="btn tiny" href={doc.fileUrl} target="_blank" rel="noreferrer">Open</a>
+                <a className="btn btn-ghost btn-sm" href={doc.fileUrl} target="_blank" rel="noreferrer">Open</a>
               </div>
             ))}
 
@@ -302,7 +302,7 @@ export function StageDrawer({ projectId, stageId, onClose }) {
             {detail.signoffs.map((s) => (
               <div key={s.id} className="list-row">
                 <div>
-                  <Badge tone={s.decision === 'APPROVED' ? 'success' : 'danger'}>{s.decision}</Badge>
+                  <Badge tone={s.decision === 'APPROVED' ? 'green' : 'red'}>{s.decision}</Badge>
                   <p className="muted xsmall">{s.signedByName} · {s.signedAt?.slice(0, 16).replace('T', ' ')}</p>
                   {s.note && <p className="small">{s.note}</p>}
                 </div>
@@ -315,9 +315,9 @@ export function StageDrawer({ projectId, stageId, onClose }) {
                   <textarea rows={2} value={signoffNote} onChange={(e) => setSignoffNote(e.target.value)} />
                 </Field>
                 <div className="row gap-sm">
-                  <button className="btn primary" type="button" disabled={signingOff}
+                  <button className="btn" type="button" disabled={signingOff}
                     onClick={() => submitSignoff('APPROVED')}>Approve</button>
-                  <button className="btn danger" type="button" disabled={signingOff}
+                  <button className="btn btn-danger" type="button" disabled={signingOff}
                     onClick={() => submitSignoff('REJECTED')}>Reject</button>
                 </div>
               </div>

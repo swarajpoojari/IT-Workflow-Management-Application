@@ -194,6 +194,13 @@ const STAGE_GRANTS = {
   'UAT & Go-Live':              { ADMIN: [A.VIEW, A.SIGNOFF], IT_MEMBER: EVERYDAY },
 };
 
+// Stages must start before they finish, or the cycle-time report goes negative.
+const daysBefore = (isoDate, days) => {
+  const d = new Date(`${isoDate}T09:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - days);
+  return d.toISOString();
+};
+
 function grantsFor(stageName, roles) {
   const grants = [];
   for (const [roleKey, actions] of Object.entries(STAGE_GRANTS[stageName] ?? {})) {
@@ -332,9 +339,9 @@ function seedProjects(users, { template, publishedVersion }) {
   const stages = stageModel.listByProject(flagship.id);
 
   const script = [
-    { index: 0, status: STAGE_STATUS.COMPLETED,  completionDate: '2026-07-12', remarks: 'Scope signed off by the client steering group.' },
-    { index: 1, status: STAGE_STATUS.IN_PROGRESS, remarks: 'Threat model drafted; pen-test window booked.' },
-    { index: 2, status: STAGE_STATUS.BLOCKED,     blocker: 'Awaiting firewall change approval from NetOps (CHG-4471).' },
+    { index: 0, status: STAGE_STATUS.COMPLETED,  completionDate: '2026-07-12', startedOn: '2026-07-02', remarks: 'Scope signed off by the client steering group.' },
+    { index: 1, status: STAGE_STATUS.IN_PROGRESS, startedOn: '2026-07-13', remarks: 'Threat model drafted; pen-test window booked.' },
+    { index: 2, status: STAGE_STATUS.BLOCKED,     startedOn: '2026-07-20', blocker: 'Awaiting firewall change approval from NetOps (CHG-4471).' },
   ];
 
   transaction(() => {
@@ -355,7 +362,7 @@ function seedProjects(users, { template, publishedVersion }) {
         completionDate: step.completionDate ?? null,
         remarks: step.remarks ?? null,
         updatedBy: itMember.id,
-        startedAt: new Date().toISOString(),
+        startedAt: `${step.startedOn}T09:00:00.000Z`,
       });
 
       statusHistoryModel.append({
@@ -469,9 +476,9 @@ function seedDelivery(users, roles) {
 
   transaction(() => {
     for (const [index, status, extra] of [
-      [0, STAGE_STATUS.COMPLETED, { completionDate: '2026-07-04' }],
-      [1, STAGE_STATUS.COMPLETED, { completionDate: '2026-07-10' }],
-      [2, STAGE_STATUS.COMPLETED, { completionDate: '2026-09-19' }],
+      [0, STAGE_STATUS.COMPLETED, { completionDate: '2026-07-04', ranForDays: 6 }],
+      [1, STAGE_STATUS.COMPLETED, { completionDate: '2026-07-10', ranForDays: 4 }],
+      [2, STAGE_STATUS.COMPLETED, { completionDate: '2026-09-19', ranForDays: 21 }],
     ]) {
       const stage = stages[index];
       stageModel.updateAssignment(stage.id, { assignedTo: dev.id, dueDate: null, updatedBy: admin.id });
@@ -483,7 +490,8 @@ function seedDelivery(users, roles) {
       }
       stageModel.applyStatusChange(stage.id, {
         status, blocker: null, holdReason: null, completionDate: extra.completionDate,
-        remarks: null, updatedBy: dev.id, startedAt: new Date().toISOString(),
+        remarks: null, updatedBy: dev.id,
+        startedAt: daysBefore(extra.completionDate, extra.ranForDays),
       });
       statusHistoryModel.append({
         projectStageId: stage.id, fromStatus: STAGE_STATUS.NOT_STARTED, toStatus: status,
@@ -494,7 +502,7 @@ function seedDelivery(users, roles) {
     stageModel.updateAssignment(testing.id, { assignedTo: qa.id, dueDate: null, updatedBy: admin.id });
     stageModel.applyStatusChange(testing.id, {
       status: STAGE_STATUS.IN_PROGRESS, blocker: null, holdReason: null, completionDate: null,
-      remarks: 'Cycle 1 execution underway.', updatedBy: qa.id, startedAt: new Date().toISOString(),
+      remarks: 'Cycle 1 execution underway.', updatedBy: qa.id, startedAt: '2026-09-20T09:00:00.000Z',
     });
     statusHistoryModel.append({
       projectStageId: testing.id, fromStatus: STAGE_STATUS.NOT_STARTED,

@@ -17,15 +17,15 @@ const TABS = [
 ];
 
 const DERIVED_TONE = {
-  NOT_STARTED: 'neutral', IN_PROGRESS: 'info', AT_RISK: 'danger',
-  ON_HOLD: 'warn', COMPLETED: 'success', CANCELLED: 'neutral',
+  NOT_STARTED: 'neutral', IN_PROGRESS: 'accent', AT_RISK: 'red',
+  ON_HOLD: 'amber', COMPLETED: 'green', CANCELLED: 'neutral',
 };
 
 function OverviewTab({ project }) {
   const p = project.progress;
   return (
     <div className="stack">
-      <section className="card">
+      <section className="card card-pad">
         <h3>Project details</h3>
         <dl className="field-grid wide">
           <div><dt>Code</dt><dd>{project.code}</dd></div>
@@ -41,7 +41,7 @@ function OverviewTab({ project }) {
         {project.description && <p className="muted small">{project.description}</p>}
       </section>
 
-      <section className="card">
+      <section className="card card-pad">
         <h3>Overall progress</h3>
         {}
         {/* Percentage and status are derived server-side from the stage rows. */}
@@ -52,19 +52,19 @@ function OverviewTab({ project }) {
             <p className="muted xsmall">{p.completed} of {p.total} stages complete</p>
           </div>
         </div>
-        <div className="stat-row">
-          {[['Completed', p.completed, 'success'], ['In progress', p.inProgress, 'info'],
-            ['Blocked', p.blocked, 'danger'], ['On hold', p.onHold, 'warn'],
+        <div className="grid grid-4">
+          {[['Completed', p.completed, 'green'], ['In progress', p.inProgress, 'accent'],
+            ['Blocked', p.blocked, 'red'], ['On hold', p.onHold, 'amber'],
             ['Not started', p.notStarted, 'neutral']].map(([label, value, tone]) => (
-            <div key={label} className={`stat tone-${tone}`}>
-              <span className="stat-value">{value}</span>
-              <span className="muted xsmall">{label}</span>
+            <div key={label} className={`stat accent-${tone}`}>
+              <div className="stat-value">{value}</div>
+              <div className="stat-label">{label}</div>
             </div>
           ))}
         </div>
       </section>
 
-      <section className="card">
+      <section className="card card-pad">
         <h3>Stage statuses</h3>
         <ul className="stage-status-list">
           {project.stages.map((stage) => (
@@ -99,7 +99,7 @@ function AssignTab({ project, onChanged }) {
   };
 
   return (
-    <section className="card">
+    <section className="card card-pad">
       <h3>Stage owners and dates</h3>
       <p className="muted small">Assignment never changes a stage status.</p>
       <table className="table">
@@ -137,7 +137,7 @@ function AssignTab({ project, onChanged }) {
 
 function WorkflowTab({ project, onOpenStage }) {
   return (
-    <section className="card">
+    <section className="card card-pad">
       <h3>Workflow journey</h3>
       <p className="muted small">Open a stage to update status, attach evidence, sign off, or work the bug loop.</p>
       <ol className="journey">
@@ -152,11 +152,11 @@ function WorkflowTab({ project, onOpenStage }) {
                 <strong>{stage.sequence}. {stage.name}</strong>
                 <StatusBadge status={stage.status} />
               </div>
-              <div className="row gap-sm wrap">
+              <div className="row gap-sm">
                 {stage.assigneeName && <span className="muted xsmall">{stage.assigneeName}</span>}
                 {stage.dueDate && <span className="muted xsmall">due {stage.dueDate}</span>}
                 {!stage.clientVisible && <Badge tone="neutral">Internal</Badge>}
-                {stage.stageType !== 'GENERIC' && <Badge tone="info">{stage.stageType}</Badge>}
+                {stage.stageType !== 'GENERIC' && <Badge tone="accent">{stage.stageType}</Badge>}
                 {stage.requiresSignoff && <Badge tone="violet">Sign-off</Badge>}
               </div>
               {stage.blocker && <p className="small danger-text">Blocked: {stage.blocker}</p>}
@@ -173,7 +173,7 @@ function TeamTab({ project }) {
     return <EmptyState title="Team not visible" hint="Your role cannot view project membership." />;
   }
   return (
-    <section className="card">
+    <section className="card card-pad">
       <h3>Project team</h3>
       <table className="table">
         <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>On project</th><th>Status</th></tr></thead>
@@ -183,8 +183,8 @@ function TeamTab({ project }) {
               <td>{m.fullName}</td>
               <td className="muted">{m.email}</td>
               <td>{m.roleKey}</td>
-              <td><Badge tone={m.roleInProject === 'OWNER' ? 'info' : 'neutral'}>{m.roleInProject}</Badge></td>
-              <td>{m.isActive ? <Badge tone="success">Active</Badge> : <Badge tone="danger">Inactive</Badge>}</td>
+              <td><Badge tone={m.roleInProject === 'OWNER' ? 'accent' : 'neutral'}>{m.roleInProject}</Badge></td>
+              <td>{m.isActive ? <Badge tone="green">Active</Badge> : <Badge tone="red">Inactive</Badge>}</td>
             </tr>
           ))}
         </tbody>
@@ -204,7 +204,7 @@ function DocumentsTab({ project, onOpenStage }) {
   }
 
   return (
-    <section className="card">
+    <section className="card card-pad">
       <h3>All project documents</h3>
       <table className="table">
         <thead><tr><th>Document</th><th>Stage</th><th>Version</th><th>Uploaded by</th><th /></tr></thead>
@@ -217,7 +217,7 @@ function DocumentsTab({ project, onOpenStage }) {
               </td>
               <td>v{doc.version}</td>
               <td className="muted">{doc.uploadedByName}</td>
-              <td><a className="btn tiny" href={doc.fileUrl} target="_blank" rel="noreferrer">Open</a></td>
+              <td><a className="btn btn-ghost btn-sm" href={doc.fileUrl} target="_blank" rel="noreferrer">Open</a></td>
             </tr>
           ))}
         </tbody>

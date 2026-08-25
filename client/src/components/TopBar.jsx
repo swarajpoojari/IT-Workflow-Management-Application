@@ -134,7 +134,9 @@ function NotificationBell() {
   return (
     <div className="bell-wrap">
       <button
-        type="button" className="btn ghost bell" aria-label="Notifications"
+        type="button" className="btn btn-ghost bell"
+        aria-label="Notifications"
+        title={unreadCount > 0 ? `Notifications — ${unreadCount} unread` : 'Notifications'}
         onClick={() => dispatch(toggleTray())}
       >
         ◔{unreadCount > 0 && <span className="bell-dot">{unreadCount > 9 ? '9+' : unreadCount}</span>}
@@ -182,10 +184,17 @@ export function TopBar() {
     <header className="topbar">
       <SearchBox />
       <div className="row gap-sm">
-        <Link className="btn ghost" to="/track" target="_blank" rel="noreferrer" title="Public tracking page">
+        <Link
+          className="btn btn-ghost" to="/track" target="_blank" rel="noreferrer"
+          title="Open the public tracking page — clients look a project up by BRD number, no login"
+        >
           ◎ Track
         </Link>
-        <button type="button" className="btn ghost" onClick={cycle} aria-label="Toggle dark mode">
+        <button
+          type="button" className="btn btn-ghost" onClick={cycle}
+          aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+        >
           {theme === 'dark' ? '☀' : '☾'}
         </button>
         <NotificationBell />

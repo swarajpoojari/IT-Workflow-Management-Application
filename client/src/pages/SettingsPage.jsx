@@ -6,6 +6,16 @@ import {
 import { usePermission } from '../hooks/usePermission.js';
 import { ErrorNote, Field, Spinner } from '../components/ui/Bits.jsx';
 
+// The system table is key/value, so give the known keys a readable label
+// instead of showing a raw dotted key to the user.
+const SYSTEM_LABELS = {
+  'app.name': 'Application name',
+  'app.defaultStageSlaDays': 'Default stage SLA (days)',
+};
+const humanise = (key) =>
+  SYSTEM_LABELS[key]
+  ?? key.split('.').pop().replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase());
+
 export function SettingsPage() {
   const dispatch = useDispatch();
   const mine = useSelector((s) => s.settings.mine);
@@ -29,14 +39,14 @@ export function SettingsPage() {
       <header className="page-head"><h1>Settings</h1></header>
       <ErrorNote error={error} />
 
-      <section className="card">
+      <section className="card card-pad">
         <h3>Appearance</h3>
         <Field label="Theme" hint="System follows your operating system setting.">
           <div className="row gap-sm">
             {['light', 'dark', 'system'].map((option) => (
               <button
                 key={option} type="button"
-                className={`btn ${mine.theme === option ? 'primary' : ''}`}
+                className={`btn ${mine.theme === option ? '' : 'btn-secondary'}`}
                 onClick={() => { dispatch(setTheme(option)); update({ theme: option }); }}
               >
                 {option[0].toUpperCase() + option.slice(1)}
@@ -52,7 +62,7 @@ export function SettingsPage() {
         </Field>
       </section>
 
-      <section className="card">
+      <section className="card card-pad">
         <h3>Notifications</h3>
         {[['notifyAssignments', 'Stage assignments'], ['notifyBugs', 'Bug activity'], ['notifySignoffs', 'Sign-off decisions']]
           .map(([key, label]) => (
@@ -67,11 +77,11 @@ export function SettingsPage() {
       </section>
 
       {canReadSystem && (
-        <section className="card">
+        <section className="card card-pad">
           <h3>System</h3>
           {Object.keys(systemDraft).length === 0 && <p className="muted small">No system settings recorded.</p>}
           {Object.entries(systemDraft).map(([key, value]) => (
-            <Field key={key} label={key}>
+            <Field key={key} label={humanise(key)}>
               <input
                 value={value ?? ''} disabled={!canWriteSystem}
                 onChange={(e) => setSystemDraft({ ...systemDraft, [key]: e.target.value })}
@@ -79,7 +89,7 @@ export function SettingsPage() {
             </Field>
           ))}
           {canWriteSystem && Object.keys(systemDraft).length > 0 && (
-            <button className="btn primary" type="button" onClick={() => dispatch(saveSystemSettings(systemDraft))}>
+            <button className="btn" type="button" onClick={() => dispatch(saveSystemSettings(systemDraft))}>
               Save system settings
             </button>
           )}

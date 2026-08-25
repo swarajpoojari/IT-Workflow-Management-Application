@@ -12,9 +12,17 @@ import { Modal } from '../components/ui/Modal.jsx';
 import { Badge, ErrorNote, Field, Spinner, EmptyState } from '../components/ui/Bits.jsx';
 
 const blankStage = {
-  name: '', description: '', clientVisible: true,
-  requiresDocument: false, expectedDurationDays: '', defaultOwnerTeam: '',
+  name: '', description: '', clientVisible: true, requiresDocument: false,
+  stageType: 'GENERIC', requiresSignoff: false,
+  expectedDurationDays: '', defaultOwnerTeam: '',
 };
+
+const STAGE_TYPES = [
+  ['GENERIC', 'Generic'],
+  ['DEVELOPMENT', 'Development'],
+  ['TESTING', 'Testing — carries the bug loop'],
+  ['UAT', 'UAT'],
+];
 
 function StageDialog({ stage, onSave, onClose, busy }) {
   const [form, setForm] = useState(stage ? { ...blankStage, ...stage } : blankStage);
@@ -27,6 +35,8 @@ function StageDialog({ stage, onSave, onClose, busy }) {
       description: form.description?.trim() || null,
       clientVisible: form.clientVisible,
       requiresDocument: form.requiresDocument,
+      stageType: form.stageType,
+      requiresSignoff: form.requiresSignoff,
       expectedDurationDays: form.expectedDurationDays === '' ? null : Number(form.expectedDurationDays),
       defaultOwnerTeam: form.defaultOwnerTeam?.trim() || null,
     });
@@ -93,13 +103,39 @@ function StageDialog({ stage, onSave, onClose, busy }) {
           </span>
         </label>
 
-        <label className="check">
+        <label className="check" style={{ marginBottom: 10 }}>
           <input
             type="checkbox" checked={form.requiresDocument}
             onChange={(e) => setForm({ ...form, requiresDocument: e.target.checked })}
           />
           <span>Requires a supporting document</span>
         </label>
+
+        <label className="check" style={{ marginBottom: 14 }}>
+          <input
+            type="checkbox" checked={form.requiresSignoff}
+            onChange={(e) => setForm({ ...form, requiresSignoff: e.target.checked })}
+          />
+          <span>
+            <strong>Requires sign-off</strong>
+            <br />
+            <small className="muted">
+              The stage cannot be completed until its latest sign-off decision is Approved.
+            </small>
+          </span>
+        </label>
+
+        <Field
+          label="Stage type"
+          hint="A Testing stage gains the QA/development bug loop and cannot be completed while any bug is open."
+        >
+          <select
+            value={form.stageType}
+            onChange={(e) => setForm({ ...form, stageType: e.target.value })}
+          >
+            {STAGE_TYPES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select>
+        </Field>
       </form>
     </Modal>
   );
@@ -318,6 +354,10 @@ export function SopBuilderPage() {
                           {stage.clientVisible ? 'Client-visible' : 'Internal only'}
                         </Badge>
                         {stage.requiresDocument && <Badge tone="accent">Document required</Badge>}
+                        {stage.stageType && stage.stageType !== 'GENERIC' && (
+                          <Badge tone="accent">{stage.stageType}</Badge>
+                        )}
+                        {stage.requiresSignoff && <Badge tone="violet">Sign-off</Badge>}
                         {stage.expectedDurationDays != null && <Badge>{stage.expectedDurationDays}d</Badge>}
                       </div>
                     </div>

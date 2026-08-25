@@ -5,8 +5,8 @@ import { fetchReports } from '../features/reports/reportsSlice.js';
 import { Badge, ErrorNote, ProgressBar, Spinner, EmptyState } from '../components/ui/Bits.jsx';
 
 const TONE = {
-  NOT_STARTED: 'neutral', IN_PROGRESS: 'info', AT_RISK: 'danger',
-  ON_HOLD: 'warn', COMPLETED: 'success', CANCELLED: 'neutral',
+  NOT_STARTED: 'neutral', IN_PROGRESS: 'accent', AT_RISK: 'red',
+  ON_HOLD: 'amber', COMPLETED: 'green', CANCELLED: 'neutral',
 };
 
 export function ReportsPage() {
@@ -34,26 +34,29 @@ export function ReportsPage() {
         </div>
       </header>
 
-      <section className="stat-row cards">
-        {[['Projects', data.totals.projects], ['Stages', data.totals.stages],
-          ['Overdue', data.totals.overdue], ['Open bugs', data.totals.openBugs]].map(([label, value]) => (
-          <div key={label} className="card stat-card">
-            <span className="stat-value big">{value}</span>
-            <span className="muted xsmall">{label}</span>
+      <section className="grid grid-4">
+        {[['Projects', data.totals.projects, null],
+          ['Stages', data.totals.stages, null],
+          ['Overdue', data.totals.overdue, data.totals.overdue ? 'var(--red)' : null],
+          ['Open bugs', data.totals.openBugs, data.totals.openBugs ? 'var(--amber)' : null],
+        ].map(([label, value, colour]) => (
+          <div key={label} className="stat">
+            <div className="stat-value" style={colour ? { color: colour } : undefined}>{value}</div>
+            <div className="stat-label">{label}</div>
           </div>
         ))}
       </section>
 
-      <section className="card">
+      <section className="card card-pad">
         <h3>Projects by derived status</h3>
-        <div className="row gap-sm wrap">
+        <div className="row gap-sm">
           {Object.entries(data.projectsByStatus).map(([key, count]) => (
             <Badge key={key} tone={TONE[key]}>{key.replace('_', ' ')}: {count}</Badge>
           ))}
         </div>
       </section>
 
-      <section className="card">
+      <section className="card card-pad">
         <h3>Project progress</h3>
         <table className="table">
           <thead><tr><th>Code</th><th>Project</th><th>Client</th><th>Target</th><th>Progress</th></tr></thead>
@@ -74,8 +77,8 @@ export function ReportsPage() {
         </table>
       </section>
 
-      <div className="grid-2">
-        <section className="card">
+      <div className="grid grid-2">
+        <section className="card card-pad">
           <h3>Overdue stages</h3>
           {data.overdueStages.length === 0
             ? <EmptyState title="Nothing overdue" hint="Every dated stage is on time." />
@@ -95,7 +98,7 @@ export function ReportsPage() {
             )}
         </section>
 
-        <section className="card">
+        <section className="card card-pad">
           <h3>Workload</h3>
           {data.workload.length === 0
             ? <EmptyState title="No open assignments" />
@@ -107,7 +110,7 @@ export function ReportsPage() {
                     <tr key={w.id}>
                       <td>{w.full_name}</td><td className="muted">{w.team ?? '—'}</td>
                       <td>{w.open_stages}</td>
-                      <td>{w.blocked > 0 ? <Badge tone="danger">{w.blocked}</Badge> : '0'}</td>
+                      <td>{w.blocked > 0 ? <Badge tone="red">{w.blocked}</Badge> : '0'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -116,15 +119,15 @@ export function ReportsPage() {
         </section>
       </div>
 
-      <div className="grid-2">
-        <section className="card">
+      <div className="grid grid-2">
+        <section className="card card-pad">
           <h3>Open bugs by severity</h3>
           {Object.keys(openBugsBySeverity).length === 0
             ? <EmptyState title="No open bugs" />
             : (
-              <div className="row gap-sm wrap">
+              <div className="row gap-sm">
                 {Object.entries(openBugsBySeverity).map(([sev, count]) => (
-                  <Badge key={sev} tone={sev === 'CRITICAL' ? 'danger' : sev === 'HIGH' ? 'warn' : 'neutral'}>
+                  <Badge key={sev} tone={sev === 'CRITICAL' ? 'red' : sev === 'HIGH' ? 'amber' : 'neutral'}>
                     {sev}: {count}
                   </Badge>
                 ))}
@@ -132,7 +135,7 @@ export function ReportsPage() {
             )}
         </section>
 
-        <section className="card">
+        <section className="card card-pad">
           <h3>Average stage cycle time</h3>
           {data.cycleTime.length === 0
             ? <EmptyState title="Not enough completed stages yet" />

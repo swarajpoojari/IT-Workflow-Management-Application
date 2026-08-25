@@ -73,6 +73,7 @@ router.get(
              FROM project_workflow_stages s
             WHERE s.project_id IN ${inClause}
               AND s.status = 'COMPLETED' AND s.started_at IS NOT NULL AND s.completion_date IS NOT NULL
+              AND julianday(s.completion_date) >= julianday(date(s.started_at))
             GROUP BY s.name ORDER BY avg_days DESC`,
         ).all(...ids)
       : [];

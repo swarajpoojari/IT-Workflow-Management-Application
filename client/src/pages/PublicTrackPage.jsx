@@ -41,7 +41,7 @@ export function PublicTrackPage() {
           value={brd} onChange={(e) => setBrd(e.target.value)}
           placeholder="BRD-2026-0042" aria-label="BRD number" required
         />
-        <button className="btn primary" type="submit" disabled={loading || !brd.trim()}>
+        <button className="btn" type="submit" disabled={loading || !brd.trim()}>
           {loading ? 'Looking up…' : 'Track'}
         </button>
       </form>
@@ -51,7 +51,7 @@ export function PublicTrackPage() {
 
       {data && (
         <div className="stack">
-          <section className="card">
+          <section className="card card-pad">
             <h2>{data.project.name}</h2>
             <dl className="field-grid wide">
               <div><dt>BRD number</dt><dd>{data.project.brdNumber}</dd></div>
@@ -63,7 +63,7 @@ export function PublicTrackPage() {
             </dl>
           </section>
 
-          <section className="card">
+          <section className="card card-pad">
             <h3>Progress</h3>
             <div className="progress-hero">
               <span className="progress-figure">{data.progress.percentComplete}%</span>
@@ -74,7 +74,7 @@ export function PublicTrackPage() {
             </div>
           </section>
 
-          <section className="card">
+          <section className="card card-pad">
             <h3>Stages</h3>
             <ol className="journey">
               {data.stages.map((stage, index) => (

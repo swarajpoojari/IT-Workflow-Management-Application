@@ -34,7 +34,7 @@ export function ProjectsPage() {
         </div>
         <div className="row">
           <input type="text" placeholder="Search projects…" value={search} onChange={(e) => setSearch(e.target.value)} style={{ width: 220 }} />
-          {canCreate && <Link to="/projects/new" className="btn">+ New project</Link>}
+          {canCreate && <Link to="/projects/new" className="btn" title="Create a project from a published SOP — its workflow stages are generated automatically">+ New project</Link>}
         </div>
       </div>
 
@@ -47,7 +47,7 @@ export function ProjectsPage() {
           <EmptyState
             title="No projects"
             hint={canCreate ? 'Create one from a published SOP template to get started.' : 'Projects you are assigned to will appear here.'}
-            action={canCreate ? <Link to="/projects/new" className="btn">+ New project</Link> : null}
+            action={canCreate ? <Link to="/projects/new" className="btn" title="Create a project from a published SOP — its workflow stages are generated automatically">+ New project</Link> : null}
           />
         ) : (
           <div className="table-wrap">

@@ -38,13 +38,13 @@ export function RolePreviewPage() {
         </div>
       </header>
 
-      <section className="card">
+      <section className="card card-pad">
         <h3>Choose a role to preview</h3>
-        <div className="row gap-sm wrap">
+        <div className="row gap-sm">
           {roles.map((role) => (
             <button
               key={role.id} type="button"
-              className={`btn ${selected === role.id ? 'primary' : ''}`}
+              className={`btn ${selected === role.id ? '' : 'btn-secondary'}`}
               onClick={() => setSelected(role.id)}
             >
               {role.name}
@@ -61,8 +61,8 @@ export function RolePreviewPage() {
           {}
           <div className="callout info">{preview.note}</div>
 
-          <div className="grid-2">
-            <section className="card">
+          <div className="grid grid-2">
+            <section className="card card-pad">
               <h3>Navigation as {preview.role.name}</h3>
               <ul className="plain-list">
                 {preview.navigation.map((item) => (
@@ -74,12 +74,12 @@ export function RolePreviewPage() {
               </ul>
             </section>
 
-            <section className="card">
+            <section className="card card-pad">
               <h3>Capabilities</h3>
               <ul className="plain-list">
                 {Object.entries(preview.capabilities).map(([key, value]) => (
                   <li key={key}>
-                    <Badge tone={value ? 'success' : 'neutral'}>{value ? 'yes' : 'no'}</Badge>{' '}
+                    <Badge tone={value ? 'green' : 'neutral'}>{value ? 'yes' : 'no'}</Badge>{' '}
                     {key.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase())}
                   </li>
                 ))}
@@ -87,14 +87,14 @@ export function RolePreviewPage() {
             </section>
           </div>
 
-          <section className="card">
+          <section className="card card-pad">
             <h3>Permission rows ({preview.permissions.length})</h3>
             <div className="perm-grid">
               {Object.entries(byModule).map(([module, actions]) => (
                 <div key={module}>
                   <strong>{module}</strong>
-                  <div className="row gap-sm wrap">
-                    {actions.map((a) => <Badge key={a} tone="info">{a}</Badge>)}
+                  <div className="row gap-sm">
+                    {actions.map((a) => <Badge key={a} tone="accent">{a}</Badge>)}
                   </div>
                 </div>
               ))}
