@@ -10,12 +10,19 @@ import {
   selectUser,
 } from '../features/auth/authSlice.js';
 import { ErrorNote, Field, Spinner } from '../components/ui/Bits.jsx';
+import { Avatar, AvatarFallback } from '../components/ui/avatar.jsx';
 
 const DEMO = [
-  { role: 'Super Admin',  email: 'superadmin@itwf.dev' },
-  { role: 'Admin',        email: 'admin@itwf.dev' },
-  { role: 'IT Member',    email: 'itmember@itwf.dev' },
-  { role: 'Client / Ops', email: 'client@itwf.dev' },
+  { role: 'Super Admin', email: 'superadmin@itwf.dev', blurb: 'Full system authority' },
+  { role: 'Admin', email: 'admin@itwf.dev', blurb: 'Manages users and projects' },
+  { role: 'IT Member', email: 'itmember@itwf.dev', blurb: 'Works assigned stages' },
+  { role: 'Client / Ops', email: 'client@itwf.dev', blurb: 'Read-only, own projects' },
+];
+
+const HIGHLIGHTS = [
+  ['⛭', 'SOP-driven delivery', 'Every project is generated from a published, immutable template.'],
+  ['⛨', 'Permissions that hold', 'Server-enforced at every layer — not just hidden in the UI.'],
+  ['⏱', 'Nothing goes unrecorded', 'An append-only audit trail for every change, by design.'],
 ];
 
 function landingFor(user) {
@@ -26,6 +33,11 @@ function landingFor(user) {
   if (can('users', 'create')) return '/users';
   if (can('stages', 'update_status')) return '/my-work';
   return '/projects';
+}
+
+function initialsOf(name) {
+  const parts = name.trim().split(/\s+/);
+  return (parts[0]?.[0] ?? '') + (parts.length > 1 ? parts[parts.length - 1][0] : '');
 }
 
 export function LoginPage() {
@@ -60,23 +72,51 @@ export function LoginPage() {
   };
 
   return (
-    <div className="login-page">
-      <div className="login-card">
-        <div className="login-brand">
-          <div className="brand-mark">IT</div>
-          <h1>IT Workflow Management</h1>
-          <p>Sign in to your workspace</p>
-        </div>
+    <div className="auth-shell">
+      <section className="auth-visual">
+        <div className="auth-visual-inner">
+          <div className="auth-brand">
+            <span className="brand-mark">IT</span>
+            <div>
+              <strong>IT Workflow</strong>
+              <small>Management System</small>
+            </div>
+          </div>
 
-        <div className="card card-pad">
+          <h1 className="auth-visual-title">
+            One source of truth for every engagement, start to go-live.
+          </h1>
+
+          <ul className="auth-highlights">
+            {HIGHLIGHTS.map(([icon, title, body]) => (
+              <li key={title}>
+                <span className="auth-highlight-icon" aria-hidden="true">{icon}</span>
+                <div>
+                  <strong>{title}</strong>
+                  <p>{body}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
+      <section className="auth-panel">
+        <div className="auth-panel-inner">
+          <div className="auth-panel-head">
+            <h2>Welcome back</h2>
+            <p className="muted">Sign in to your workspace to continue.</p>
+          </div>
+
           <ErrorNote error={error} onDismiss={() => dispatch(clearAuthError())} />
 
-          <form onSubmit={onSubmit}>
+          <form onSubmit={onSubmit} className="auth-form">
             <Field label="Email address" required>
               <input
                 type="email"
                 autoComplete="username"
                 required
+                autoFocus
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
                 placeholder="you@company.com"
@@ -94,29 +134,42 @@ export function LoginPage() {
               />
             </Field>
 
-            <button type="submit" className="btn btn-block" disabled={status === 'loading'}>
+            <button type="submit" className="btn btn-block btn-lg" disabled={status === 'loading'}>
               {status === 'loading' ? 'Signing in…' : 'Sign in'}
             </button>
           </form>
 
           {status === 'loading' && <Spinner label="Authenticating…" />}
 
-          <div className="demo-accounts">
-            <h3>Demo accounts · password Passw0rd!</h3>
-            {DEMO.map((account) => (
-              <button
-                key={account.email}
-                type="button"
-                className="demo-row"
-                onClick={() => pickDemo(account.email)}
-              >
-                <span>{account.role}</span>
-                <small>{account.email}</small>
-              </button>
-            ))}
+          <div className="auth-demo">
+            <div className="auth-demo-head">
+              <span>Demo accounts</span>
+              <span className="muted xsmall">password Passw0rd!</span>
+            </div>
+            <div className="auth-demo-list">
+              {DEMO.map((account) => (
+                <button
+                  key={account.email}
+                  type="button"
+                  className="auth-demo-row"
+                  onClick={() => pickDemo(account.email)}
+                >
+                  <Avatar size="sm">
+                    <AvatarFallback className="bg-brand-soft text-brand">
+                      {initialsOf(account.role)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="auth-demo-text">
+                    <strong>{account.role}</strong>
+                    <small>{account.blurb}</small>
+                  </span>
+                  <span className="muted xsmall auth-demo-email">{account.email}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
+      </section>
     </div>
   );
 }

@@ -8,6 +8,7 @@ import { resolveScope, can } from '../../middleware/authorize.js';
 import { assertStagePermission, resolveStageAccess } from '../../middleware/stagePermission.js';
 import { bugModel } from '../../models/bug.model.js';
 import { signoffModel } from '../../models/signoff.model.js';
+import { teamModel } from '../../models/team.model.js';
 import { stagePermissionModel } from '../../models/stagePermission.model.js';
 import { notify } from '../../services/notification.service.js';
 import {
@@ -214,6 +215,16 @@ export const stagesService = {
       throw ApiError.conflict('This stage is already completed', undefined, 'STAGE_COMPLETED');
     }
 
+    // Approving silently is fine. Rejecting silently leaves the owner with no
+    // idea what to fix, so a rejection must say why.
+    if (decision === SIGNOFF_DECISION.REJECTED && !note?.trim()) {
+      throw ApiError.badRequest(
+        'A rejection needs a note explaining what must change',
+        { field: 'note' },
+        'REJECTION_NOTE_REQUIRED',
+      );
+    }
+
     const signoff = transaction(() => {
       const row = signoffModel.create({
         projectStageId: stage.id,
@@ -272,12 +283,42 @@ export const stagesService = {
   assign(user, projectId, stageId, payload) {
     const { project, stage } = loadStage(user, projectId, stageId);
 
+    // A due date before the project even starts is not a schedule, it is a typo.
+    if (payload.dueDate && project.startDate && payload.dueDate < project.startDate) {
+      throw ApiError.badRequest(
+        `Due date cannot be earlier than the project start date (${project.startDate})`,
+        { field: 'dueDate', startDate: project.startDate },
+        'DUE_BEFORE_START',
+      );
+    }
+
+    if (payload.owningTeamId) {
+      const team = teamModel.findById(payload.owningTeamId);
+      if (!team) throw ApiError.badRequest('Team not found', { field: 'owningTeamId' });
+    }
+
     if (payload.assignedTo) {
       const assignee = userModel.findById(payload.assignedTo);
       if (!assignee) throw ApiError.badRequest('Assignee not found', { field: 'assignedTo' });
       if (!assignee.isActive) {
         throw ApiError.badRequest('Cannot assign work to a deactivated user', { field: 'assignedTo' });
       }
+
+      // The stage belongs to a team, so its owner comes from that team — unless
+      // the team has nobody active to draw on, in which case anyone may take it.
+      const teamId = payload.owningTeamId !== undefined ? payload.owningTeamId : stage.owningTeamId;
+      if (teamId) {
+        const pool = teamModel.assignableMembers(teamId);
+        if (pool.length > 0 && !pool.some((member) => member.id === payload.assignedTo)) {
+          const team = teamModel.findById(teamId);
+          throw ApiError.badRequest(
+            `"${stage.name}" is owned by ${team.name}, so only an active member of that team can own it.`,
+            { field: 'assignedTo', teamId, teamName: team.name },
+            'NOT_IN_OWNING_TEAM',
+          );
+        }
+      }
+
       projectModel.addMember(project.id, payload.assignedTo, 'MEMBER');
     }
 

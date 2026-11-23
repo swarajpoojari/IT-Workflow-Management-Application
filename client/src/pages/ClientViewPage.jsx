@@ -1,12 +1,14 @@
 import { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useParams, Link } from 'react-router-dom';
+import { ListChecks, CircleCheck, Gauge } from 'lucide-react';
 import {
   fetchProject, selectCurrentProject, selectProjectsStatus,
   selectProjectsError, selectProgressStats,
 } from '../features/projects/projectsSlice.js';
 import { selectUser } from '../features/auth/authSlice.js';
-import { Badge, ErrorNote, ProgressBar, Spinner, StatusBadge } from '../components/ui/Bits.jsx';
+import { Badge, ErrorNote, ProgressBar, Spinner, StatusBadge, KpiCard } from '../components/ui/Bits.jsx';
+import { usePageMeta } from '../hooks/usePageMeta.js';
 
 export function ClientViewPage() {
   const { id } = useParams();
@@ -20,6 +22,11 @@ export function ClientViewPage() {
 
   useEffect(() => { dispatch(fetchProject(Number(id))); }, [dispatch, id]);
 
+  usePageMeta(
+    project?.name,
+    project ? `${project.clientName} · Target completion ${project.targetEndDate ?? 'TBC'}` : '',
+  );
+
   if (status === 'loading' && !project) return <Spinner label="Loading project…" />;
   if (error) return <ErrorNote error={error} />;
   if (!project) return null;
@@ -32,11 +39,9 @@ export function ClientViewPage() {
             <Link to="/projects" className="muted" style={{ fontSize: 13 }}>← My projects</Link>
             <span className="mono muted">{project.code}</span>
           </div>
-          <h1>{project.name}</h1>
-          <p>{project.clientName} · Target completion {project.targetEndDate ?? 'TBC'}</p>
         </div>
         <div style={{ minWidth: 220 }}>
-          <ProgressBar value={stats.percentComplete} label={`${stats.completed}/${stats.total} done`} />
+          <ProgressBar value={stats.percentComplete} label={`${stats.completed}/${stats.total} done`} segments={stats.total} />
         </div>
       </div>
 
@@ -51,10 +56,10 @@ export function ClientViewPage() {
         </div>
       </div>
 
-      <div className="grid grid-3" style={{ marginBottom: 18 }}>
-        <div className="stat"><div className="stat-value">{stats.total}</div><div className="stat-label">Milestones</div></div>
-        <div className="stat"><div className="stat-value" style={{ color: 'var(--green)' }}>{stats.completed}</div><div className="stat-label">Completed</div></div>
-        <div className="stat"><div className="stat-value">{stats.percentComplete}%</div><div className="stat-label">Progress</div></div>
+      <div className="kpi-row" style={{ marginBottom: 18 }}>
+        <KpiCard icon={ListChecks} label="Milestones" value={stats.total} tone="accent" />
+        <KpiCard icon={CircleCheck} label="Completed" value={stats.completed} tone="green" />
+        <KpiCard icon={Gauge} label="Progress" value={`${stats.percentComplete}%`} tone="violet" ring={stats.percentComplete} />
       </div>
 
       <div className="card">

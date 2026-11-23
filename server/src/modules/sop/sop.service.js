@@ -37,15 +37,50 @@ function assertDraft(version) {
 }
 
 export const sopService = {
+  /**
+   * The SOP library. Each row carries enough to render a card without a second
+   * request: the live stage sequence, the estimated cycle, who last edited it
+   * and how many engagements are running on it.
+   */
   listTemplates({ includeInactive = false } = {}) {
     return sopTemplateModel.list({ includeInactive }).map((template) => {
       const published = sopVersionModel.findLatestPublished(template.id);
       const draft = sopVersionModel.findDraft(template.id);
+
+      // Prefer the live sequence; fall back to the draft for an unpublished SOP.
+      const shownVersion = published ?? draft;
+      const stages = shownVersion ? sopStageModel.listByVersion(shownVersion.id) : [];
+      const estimatedCycleDays = stages.reduce((n, s) => n + (s.expectedDurationDays ?? 0), 0);
+
       return {
         ...template,
-        publishedVersion: published ? { id: published.id, version: published.version, publishedAt: published.publishedAt } : null,
-        draftVersion: draft ? { id: draft.id, version: draft.version } : null,
+        publishedVersion: published
+          ? {
+              id: published.id,
+              version: published.version,
+              publishedAt: published.publishedAt,
+              projectCount: sopVersionModel.countProjectsUsing(published.id),
+            }
+          : null,
+        draftVersion: draft
+          ? { id: draft.id, version: draft.version, stageCount: sopStageModel.listByVersion(draft.id).length }
+          : null,
+        stages: stages.map((s) => ({
+          id: s.id,
+          name: s.name,
+          sequence: s.sequence,
+          clientVisible: s.clientVisible,
+          stageType: s.stageType,
+          requiresSignoff: s.requiresSignoff,
+          expectedDurationDays: s.expectedDurationDays,
+          defaultOwnerTeamName: s.defaultOwnerTeamName ?? null,
+        })),
+        stageCount: stages.length,
+        estimatedCycleDays,
+        versionCount: sopVersionModel.listByTemplate(template.id).length,
         projectCount: sopTemplateModel.countProjects(template.id),
+        activeProjectCount: sopTemplateModel.countActiveProjects(template.id),
+        lastEdit: sopTemplateModel.lastEdit(template.id),
       };
     });
   },

@@ -26,14 +26,31 @@ CREATE TABLE IF NOT EXISTS role_permissions (
   PRIMARY KEY (role_id, permission_id)
 );
 
+CREATE TABLE IF NOT EXISTS teams (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  name         TEXT    NOT NULL UNIQUE,
+  description  TEXT,
+  -- Department the team sits in: Technology, Infrastructure, Business Operations…
+  category     TEXT,
+  -- Named lead. Nullable so a team can exist before anyone runs it.
+  lead_user_id INTEGER REFERENCES users (id) ON DELETE SET NULL,
+  is_active    INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+  created_at   TEXT    NOT NULL DEFAULT (datetime('now')),
+  updated_at   TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS users (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
   email         TEXT    NOT NULL UNIQUE,
   password_hash TEXT    NOT NULL,
   full_name     TEXT    NOT NULL,
   role_id       INTEGER NOT NULL REFERENCES roles (id),
+  -- Legacy free-text team label, superseded by team_id. Kept so older rows read.
   team          TEXT,
+  team_id       INTEGER REFERENCES teams (id) ON DELETE SET NULL,
   client_name   TEXT,
+  -- Set when an admin creates the account with a generated temporary password.
+  must_change_password INTEGER NOT NULL DEFAULT 0 CHECK (must_change_password IN (0, 1)),
   is_active     INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
   created_at    TEXT    NOT NULL DEFAULT (datetime('now')),
   updated_at    TEXT    NOT NULL DEFAULT (datetime('now'))
@@ -96,7 +113,10 @@ CREATE TABLE IF NOT EXISTS sop_stages (
   stage_type            TEXT    NOT NULL DEFAULT 'GENERIC',
   requires_signoff      INTEGER NOT NULL DEFAULT 0 CHECK (requires_signoff IN (0, 1)),
   expected_duration_days INTEGER,
+  -- Legacy free-text label, superseded by default_owner_team_id.
   default_owner_team    TEXT,
+  -- Every project generated from this version inherits this owning team.
+  default_owner_team_id INTEGER REFERENCES teams (id) ON DELETE SET NULL,
   created_at            TEXT    NOT NULL DEFAULT (datetime('now')),
   UNIQUE (sop_version_id, sequence)
 );
@@ -150,6 +170,8 @@ CREATE TABLE IF NOT EXISTS project_workflow_stages (
   requires_signoff  INTEGER NOT NULL DEFAULT 0 CHECK (requires_signoff IN (0, 1)),
   status            TEXT    NOT NULL DEFAULT 'NOT_STARTED'
                             CHECK (status IN ('NOT_STARTED', 'IN_PROGRESS', 'BLOCKED', 'ON_HOLD', 'COMPLETED')),
+  -- Inherited from the SOP stage at generation; an admin may move it.
+  owning_team_id    INTEGER REFERENCES teams (id) ON DELETE SET NULL,
   assigned_to       INTEGER REFERENCES users (id),
   due_date          TEXT,
   started_at        TEXT,

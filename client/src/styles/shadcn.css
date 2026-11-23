@@ -1,0 +1,107 @@
+/* ──────────────────────────────────────────────────────────────────────────
+   Tailwind + shadcn/ui, wired to this app's existing design tokens.
+
+   shadcn's own docs have components read a fixed set of semantic variables
+   (--background, --primary, --border, --radius, …) and ship a default oklch
+   palette for them, redefined again under a `.dark` class. This app already
+   has its own tokens, already theme-aware via `[data-theme]` on <html> (see
+   index.css) — including the "system" case, handled there with a prefers-
+   color-scheme media query. Rather than keep two palettes and two dark-mode
+   mechanisms in parallel, every shadcn variable below points at this app's
+   existing token with `var()`, so a shadcn component follows the same theme
+   switch automatically, with no .dark class and no extra dark-mode CSS here.
+
+   Consequence: anything shadcn-related should be styled with the semantic
+   utility classes (bg-background, text-foreground, bg-primary, …), which
+   read these variables — not raw Tailwind palette utilities (bg-slate-900)
+   and not the `dark:` variant, which this file does not configure. A literal
+   `dark:` utility would silently do nothing; it is not needed here because
+   the underlying variables already change value when the theme does.
+
+   Collision note: shadcn's own scaffold defines bare `--accent`, `--radius`,
+   etc. on :root and then re-exports them in `@theme inline` as `--color-accent`
+   etc. This file skips that middle step and points `--color-*` straight at
+   this app's existing tokens, so no new `--accent` / `--radius` custom
+   property is declared here to collide with the ones index.css already owns.
+   ────────────────────────────────────────────────────────────────────────── */
+
+@import "tailwindcss";
+
+/* A single base value for shadcn's radius scale, kept under its own name so
+   it never collides with this app's own --radius / --radius-sm / --radius-xs
+   (a different scale, already used throughout index.css). 0.625rem matches
+   shadcn's own default and this app's existing --radius-sm. */
+:root {
+  --shadcn-radius: 0.625rem;
+}
+
+@theme inline {
+  --color-background: var(--bg);
+  --color-foreground: var(--text);
+
+  --color-card: var(--surface);
+  --color-card-foreground: var(--text);
+  --color-popover: var(--surface);
+  --color-popover-foreground: var(--text);
+
+  --color-primary: var(--accent);
+  --color-primary-foreground: #ffffff;
+
+  --color-secondary: var(--surface-2);
+  --color-secondary-foreground: var(--text);
+
+  --color-muted: var(--surface-2);
+  --color-muted-foreground: var(--text-3);
+
+  /* shadcn's "accent" is a neutral hover/highlight tone (menu items, subtle
+     emphasis) — not this app's brand accent. Mapped to the hover surface this
+     app already uses for exactly that purpose, so the two "accent" concepts
+     never actually share a value. */
+  --color-accent: var(--surface-hover);
+  --color-accent-foreground: var(--text);
+
+  --color-destructive: var(--red);
+  --color-destructive-foreground: #ffffff;
+
+  --color-border: var(--border);
+  --color-input: var(--border);
+  --color-ring: var(--accent);
+
+  --color-chart-1: var(--accent);
+  --color-chart-2: var(--green);
+  --color-chart-3: var(--violet);
+  --color-chart-4: var(--amber);
+  --color-chart-5: var(--red);
+
+  --color-sidebar: var(--surface);
+  --color-sidebar-foreground: var(--text);
+  --color-sidebar-primary: var(--accent);
+  --color-sidebar-primary-foreground: #ffffff;
+  --color-sidebar-accent: var(--surface-hover);
+  --color-sidebar-accent-foreground: var(--text);
+  --color-sidebar-border: var(--border);
+  --color-sidebar-ring: var(--accent);
+
+  --radius-sm: calc(var(--shadcn-radius) * 0.6);
+  --radius-md: calc(var(--shadcn-radius) * 0.8);
+  --radius-lg: var(--shadcn-radius);
+  --radius-xl: calc(var(--shadcn-radius) * 1.4);
+
+  /* This app's status/tone palette (used for Badge variants, status pills,
+     stage colouring, …), as proper Tailwind colors — bg-success, text-danger,
+     bg-warning-soft, and so on. "brand" stands in for the app's own accent,
+     kept distinct from shadcn's "accent" token above, which means something
+     else (a neutral hover surface) in shadcn's own vocabulary. */
+  --color-brand: var(--accent);
+  --color-brand-soft: var(--accent-soft);
+  --color-success: var(--green);
+  --color-success-soft: var(--green-soft);
+  --color-warning: var(--amber);
+  --color-warning-soft: var(--amber-soft);
+  --color-danger: var(--red);
+  --color-danger-soft: var(--red-soft);
+  --color-violet: var(--violet);
+  --color-violet-soft: var(--violet-soft);
+  --color-neutral: var(--slate);
+  --color-neutral-soft: var(--slate-soft);
+}

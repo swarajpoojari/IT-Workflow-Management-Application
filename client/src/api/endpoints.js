@@ -4,6 +4,7 @@ export const endpoints = {
     refresh: '/auth/refresh',
     logout: '/auth/logout',
     me: '/auth/me',
+    changePassword: '/auth/change-password',
   },
   users: {
     root: '/users',
@@ -12,6 +13,11 @@ export const endpoints = {
     deactivate: (id) => `/users/${id}/deactivate`,
     activate: (id) => `/users/${id}/activate`,
     reassign: (id) => `/users/${id}/reassign`,
+  },
+  teams: {
+    root: '/teams',
+    byId: (id) => `/teams/${id}`,
+    assignable: (id) => `/teams/${id}/assignable`,
   },
   roles: {
     root: '/roles',

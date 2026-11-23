@@ -1,116 +1,23 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate, Link } from 'react-router-dom';
-import { runSearch, setQuery, clearSearch } from '../features/search/searchSlice.js';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { resolvePageMeta } from '../app/pageMeta.js';
+import { selectPageMeta } from '../features/ui/uiSlice.js';
 import {
   fetchNotifications, markNotificationRead, markAllNotificationsRead, toggleTray,
 } from '../features/notifications/notificationsSlice.js';
-import { setTheme, saveMySettings } from '../features/settings/settingsSlice.js';
-import { Badge } from './ui/Bits.jsx';
+import { logout, selectUser } from '../features/auth/authSlice.js';
+// Theme switching now lives only in Settings → Appearance; no toggle here.
+import { Avatar, AvatarFallback } from './ui/avatar.jsx';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
+} from './ui/dropdown-menu.jsx';
 
-function SearchBox() {
-  const dispatch = useDispatch();
-  const navigate = useNavigate();
-  const { query, results, count, status } = useSelector((s) => s.search);
-  const [focused, setFocused] = useState(false);
-  const timer = useRef(null);
-
-  // Debounced so typing does not fire a request per keystroke.
-  useEffect(() => {
-    clearTimeout(timer.current);
-    if (query.trim().length < 2) return undefined;
-    timer.current = setTimeout(() => dispatch(runSearch(query.trim())), 250);
-    return () => clearTimeout(timer.current);
-  }, [dispatch, query]);
-
-  const go = (path) => {
-    dispatch(clearSearch());
-    setFocused(false);
-    navigate(path);
-  };
-
-  const show = focused && query.trim().length >= 2;
-
-  return (
-    <div className="searchbox">
-      <input
-        value={query}
-        placeholder="Search projects, stages, people…"
-        aria-label="Search"
-        onChange={(e) => dispatch(setQuery(e.target.value))}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setTimeout(() => setFocused(false), 150)}
-      />
-      {show && (
-        <div className="search-results">
-          {status === 'loading' && <p className="muted xsmall pad">Searching…</p>}
-          {status === 'succeeded' && count === 0 && <p className="muted xsmall pad">No matches.</p>}
-
-          {results?.projects?.length > 0 && (
-            <>
-              <p className="search-group">Projects</p>
-              {results.projects.map((p) => (
-                <button key={`p${p.id}`} type="button" className="search-hit" onClick={() => go(`/projects/${p.id}`)}>
-                  <strong>{p.code}</strong> {p.name}
-                  {p.brdNumber && <span className="muted xsmall"> · {p.brdNumber}</span>}
-                </button>
-              ))}
-            </>
-          )}
-
-          {results?.stages?.length > 0 && (
-            <>
-              <p className="search-group">Stages</p>
-              {results.stages.map((s) => (
-                <button
-                  key={`s${s.id}`} type="button" className="search-hit"
-                  onClick={() => go(`/projects/${s.project_id}?stage=${s.id}`)}
-                >
-                  {s.name} <span className="muted xsmall">· {s.project_code} · {s.status.toLowerCase()}</span>
-                </button>
-              ))}
-            </>
-          )}
-
-          {results?.bugs?.length > 0 && (
-            <>
-              <p className="search-group">Bugs</p>
-              {results.bugs.map((b) => (
-                <button
-                  key={`b${b.id}`} type="button" className="search-hit"
-                  onClick={() => go(`/projects/${b.project_id}?stage=${b.project_stage_id}`)}
-                >
-                  <strong>{b.reference}</strong> {b.title} <span className="muted xsmall">· {b.status.toLowerCase()}</span>
-                </button>
-              ))}
-            </>
-          )}
-
-          {results?.users?.length > 0 && (
-            <>
-              <p className="search-group">People</p>
-              {results.users.map((u) => (
-                <button key={`u${u.id}`} type="button" className="search-hit" onClick={() => go('/users')}>
-                  {u.full_name} <span className="muted xsmall">· {u.role_name}</span>
-                </button>
-              ))}
-            </>
-          )}
-
-          {results?.sop?.length > 0 && (
-            <>
-              <p className="search-group">SOP templates</p>
-              {results.sop.map((t) => (
-                <button key={`t${t.id}`} type="button" className="search-hit" onClick={() => go('/sop')}>
-                  {t.name}
-                </button>
-              ))}
-            </>
-          )}
-        </div>
-      )}
-    </div>
-  );
+function initialsOf(name) {
+  if (!name) return '?';
+  const parts = name.trim().split(/\s+/);
+  return (parts[0]?.[0] ?? '') + (parts.length > 1 ? parts[parts.length - 1][0] : '');
 }
 
 function NotificationBell() {
@@ -170,34 +77,64 @@ function NotificationBell() {
   );
 }
 
-export function TopBar() {
+function ProfileMenu() {
   const dispatch = useDispatch();
-  const theme = useSelector((s) => s.settings.mine.theme);
+  const navigate = useNavigate();
+  const user = useSelector(selectUser);
 
-  const cycle = () => {
-    const next = theme === 'dark' ? 'light' : 'dark';
-    dispatch(setTheme(next));
-    dispatch(saveMySettings({ theme: next }));
+  const onLogout = async () => {
+    await dispatch(logout());
+    navigate('/login', { replace: true });
   };
 
   return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button type="button" className="profile-trigger">
+          <Avatar size="sm">
+            <AvatarFallback className="bg-brand-soft text-brand">
+              {initialsOf(user?.fullName)}
+            </AvatarFallback>
+          </Avatar>
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuLabel className="profile-menu-label">
+          <strong>{user?.fullName}</strong>
+          <small className="muted">{user?.email}</small>
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={() => navigate('/settings')}>Profile</DropdownMenuItem>
+        <DropdownMenuItem variant="destructive" onSelect={onLogout}>Log out</DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+export function TopBar({ actionsRef }) {
+  const { pathname } = useLocation();
+  const override = useSelector(selectPageMeta);
+
+  // A page may name its own subject; otherwise the route decides.
+  const meta = override ?? resolvePageMeta(pathname);
+
+  return (
     <header className="topbar">
-      <SearchBox />
-      <div className="row gap-sm">
+      <div className="topbar-heading">
+        <h1 className="topbar-title">{meta.title}</h1>
+        {meta.description && <p className="topbar-sub">{meta.description}</p>}
+      </div>
+
+      <div className="row gap-sm topbar-controls">
+        <div ref={actionsRef} className="page-head-actions" />
         <Link
           className="btn btn-ghost" to="/track" target="_blank" rel="noreferrer"
           title="Open the public tracking page — clients look a project up by BRD number, no login"
         >
           ◎ Track
         </Link>
-        <button
-          type="button" className="btn btn-ghost" onClick={cycle}
-          aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-          title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-        >
-          {theme === 'dark' ? '☀' : '☾'}
-        </button>
         <NotificationBell />
+        <ProfileMenu />
       </div>
     </header>
   );

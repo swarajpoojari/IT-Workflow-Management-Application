@@ -55,6 +55,47 @@ export const sopTemplateModel = {
   countProjects(templateId) {
     return getDb().prepare('SELECT COUNT(*) AS total FROM projects WHERE sop_template_id = ?').get(templateId).total;
   },
+
+  /** Projects still running on this template — what the library card reports. */
+  countActiveProjects(templateId) {
+    return getDb()
+      .prepare(
+        `SELECT COUNT(*) AS total FROM projects
+          WHERE sop_template_id = ? AND status IN ('ACTIVE', 'ON_HOLD')`,
+      )
+      .get(templateId).total;
+  },
+
+  /**
+   * Who last touched the template, drawn from the audit log. The SOP tables
+   * record who published, but not who edited a draft stage.
+   */
+  lastEdit(templateId) {
+    const versionIds = getDb()
+      .prepare('SELECT id FROM sop_versions WHERE template_id = ?')
+      .all(templateId)
+      .map((row) => String(row.id));
+
+    const entities = [
+      `('SOP_TEMPLATE', '${templateId}')`,
+      ...versionIds.map((id) => `('SOP_VERSION', '${id}')`),
+    ].join(', ');
+
+    const row = getDb()
+      .prepare(
+        `SELECT created_at, actor_email, summary,
+                COALESCE((SELECT full_name FROM users WHERE id = actor_id), actor_email) AS actor_name
+           FROM audit_logs
+          WHERE (entity_type, entity_id) IN (${entities})
+             OR (entity_type = 'SOP_STAGE' AND entity_id IN (
+                   SELECT CAST(s.id AS TEXT) FROM sop_stages s
+                    WHERE s.sop_version_id IN (SELECT id FROM sop_versions WHERE template_id = ?)))
+          ORDER BY created_at DESC, id DESC LIMIT 1`,
+      )
+      .get(templateId);
+
+    return row ? camelize(row) : null;
+  },
 };
 
 export const sopVersionModel = {
@@ -136,13 +177,35 @@ export const sopVersionModel = {
 export const sopStageModel = {
   listByVersion(versionId) {
     return getDb()
-      .prepare('SELECT * FROM sop_stages WHERE sop_version_id = ? ORDER BY sequence')
+      .prepare(
+        `SELECT ss.*,
+                  -- A published version is frozen, so its stages may still only
+                  -- carry the legacy text label. Fall back to it for display.
+                  COALESCE(t.name, ss.default_owner_team) AS default_owner_team_name,
+                  t.category AS default_owner_team_category
+           FROM sop_stages ss
+           LEFT JOIN teams t ON t.id = ss.default_owner_team_id
+          WHERE ss.sop_version_id = ? ORDER BY ss.sequence`,
+      )
       .all(versionId)
       .map(castStage);
   },
 
   findById(id) {
-    return castStage(getDb().prepare('SELECT * FROM sop_stages WHERE id = ?').get(id));
+    return castStage(
+      getDb()
+        .prepare(
+          `SELECT ss.*,
+                  -- A published version is frozen, so its stages may still only
+                  -- carry the legacy text label. Fall back to it for display.
+                  COALESCE(t.name, ss.default_owner_team) AS default_owner_team_name,
+                  t.category AS default_owner_team_category
+             FROM sop_stages ss
+             LEFT JOIN teams t ON t.id = ss.default_owner_team_id
+            WHERE ss.id = ?`,
+        )
+        .get(id),
+    );
   },
 
   nextSequence(versionId) {
@@ -157,9 +220,11 @@ export const sopStageModel = {
       .prepare(
         `INSERT INTO sop_stages
            (sop_version_id, name, description, sequence, client_visible, requires_document,
-            stage_type, requires_signoff, expected_duration_days, default_owner_team)
+            stage_type, requires_signoff, expected_duration_days, default_owner_team,
+            default_owner_team_id)
          VALUES (@sopVersionId, @name, @description, @sequence, @clientVisible, @requiresDocument,
-                 @stageType, @requiresSignoff, @expectedDurationDays, @defaultOwnerTeam)`,
+                 @stageType, @requiresSignoff, @expectedDurationDays, @defaultOwnerTeam,
+                 @defaultOwnerTeamId)`,
       )
       .run({
         sopVersionId: stage.sopVersionId,
@@ -172,6 +237,7 @@ export const sopStageModel = {
         requiresSignoff: stage.requiresSignoff ? 1 : 0,
         expectedDurationDays: stage.expectedDurationDays ?? null,
         defaultOwnerTeam: stage.defaultOwnerTeam ?? null,
+        defaultOwnerTeamId: stage.defaultOwnerTeamId ?? null,
       });
     return sopStageModel.findById(info.lastInsertRowid);
   },
@@ -187,6 +253,7 @@ export const sopStageModel = {
       requiresSignoff: 'requires_signoff',
       expectedDurationDays: 'expected_duration_days',
       defaultOwnerTeam: 'default_owner_team',
+      defaultOwnerTeamId: 'default_owner_team_id',
     };
     const sets = [];
     const params = { id };

@@ -1,0 +1,664 @@
+/* ──────────────────────────────────────────────────────────────────────────
+   Module header, analytical dashboard, role cards, team management and the
+   segmented stage bar. Loaded after index.css and built from the same tokens
+   defined there — no second palette, and dark mode follows automatically.
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* ── Top bar: page heading (leading edge) + controls (trailing edge), one bar,
+   one background. A separate content-area heading was tried first and
+   produced an empty-looking top bar sitting above a disconnected,
+   differently-backgrounded title — reverted; see design.md D3. ───────────── */
+.topbar { align-items: flex-start; padding-top: 14px; padding-bottom: 14px; }
+.topbar-heading { flex: 1; min-width: 0; }
+.topbar-title {
+  font-size: 19px; font-weight: 650; letter-spacing: -.015em;
+  line-height: 1.2; margin: 0;
+}
+.topbar-sub {
+  margin: 3px 0 0; color: var(--text-2); font-size: 12.5px;
+  max-width: 76ch; line-height: 1.45;
+}
+.topbar-controls { flex: none; padding-top: 2px; }
+.page-head.no-title { justify-content: flex-end; }
+.page-head-actions:empty { display: none; }
+
+/* ── KPI tiles ───────────────────────────────────────────────────────────── */
+.kpi-row {
+  display: grid; gap: 14px; margin-bottom: 18px;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+.kpi {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 15px 16px;
+  display: flex; flex-direction: column; gap: 2px;
+  position: relative; overflow: hidden;
+}
+.kpi::before {
+  content: ''; position: absolute; inset: 0 auto 0 0; width: 3px;
+  background: var(--border-strong);
+}
+.kpi-accent::before  { background: var(--accent); }
+.kpi-green::before   { background: var(--green); }
+.kpi-amber::before   { background: var(--amber); }
+.kpi-red::before     { background: var(--red); }
+.kpi-violet::before  { background: var(--violet); }
+.kpi-neutral::before { background: var(--border-strong); }
+
+.kpi-link { text-decoration: none; color: inherit; transition: border-color .15s, box-shadow .15s, transform .15s; }
+.kpi-link:hover { border-color: var(--border-strong); box-shadow: var(--shadow-md); transform: translateY(-1px); }
+.kpi-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.kpi-label {
+  font-size: 11px; font-weight: 600; letter-spacing: .04em;
+  text-transform: uppercase; color: var(--text-muted);
+}
+.kpi-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--border-strong); }
+.tone-dot-accent  { background: var(--accent); }
+.tone-dot-green   { background: var(--green); }
+.tone-dot-amber   { background: var(--amber); }
+.tone-dot-red     { background: var(--red); }
+.tone-dot-neutral { background: var(--text-3); }
+.kpi-value { font-size: 25px; font-weight: 700; letter-spacing: -.025em; line-height: 1.15; }
+.kpi-sub { font-size: 11.5px; color: var(--text-secondary); }
+
+/* Icon-tile variant (the reference dashboard layout): the tone moves from the
+   left stripe into a tinted square, and the stack turns on its side. Opt-in
+   via .has-icon so the five pages still using the plain tile are untouched. */
+.kpi.has-icon { flex-direction: row; align-items: center; gap: 13px; isolation: isolate; }
+.kpi.has-icon::before { content: none; }
+
+/* Decorative gradient wave, tinted by the card's own tone (--kpi-tone) so it
+   adapts per-card and per-theme automatically rather than a fixed colour —
+   the reference's .stat-card wave, translated off hardcoded hex onto tokens.
+   Applies to every icon-tile KPI card, not just the dashboard's. */
+.kpi.has-icon::after {
+  content: ''; position: absolute; z-index: -1; pointer-events: none;
+  width: 120px; height: 56px; right: -16px; bottom: -24px;
+  background: radial-gradient(
+    ellipse at center,
+    color-mix(in srgb, var(--kpi-tone, var(--accent)) 16%, transparent),
+    transparent 72%
+  );
+  border-radius: 50%; transform: rotate(-12deg);
+}
+.kpi-icon {
+  width: 38px; height: 38px; border-radius: 11px; flex: none;
+  display: grid; place-items: center; font-size: 16px; line-height: 1;
+  background: var(--slate-soft); color: var(--text-2);
+}
+.kpi-accent { --kpi-tone: var(--accent); }
+.kpi-green  { --kpi-tone: var(--green); }
+.kpi-amber  { --kpi-tone: var(--amber); }
+.kpi-red    { --kpi-tone: var(--red); }
+.kpi-violet { --kpi-tone: var(--violet); }
+.kpi-neutral { --kpi-tone: var(--slate); }
+
+.kpi-accent .kpi-icon { background: var(--accent-soft); color: var(--accent); }
+.kpi-green  .kpi-icon { background: var(--green-soft);  color: var(--green); }
+.kpi-amber  .kpi-icon { background: var(--amber-soft);  color: var(--amber); }
+.kpi-red    .kpi-icon { background: var(--red-soft);    color: var(--red); }
+.kpi-violet .kpi-icon { background: var(--violet-soft); color: var(--violet); }
+.kpi-body { display: grid; gap: 1px; min-width: 0; }
+.kpi.has-icon .kpi-label { text-transform: none; letter-spacing: 0; font-size: 11.5px; font-weight: 500; }
+
+/* Completion ring — a conic gradient, so no chart library for one dial. */
+.kpi-ring {
+  width: 42px; height: 42px; border-radius: 50%; flex: none; margin-left: auto;
+  display: grid; place-items: center;
+  background: conic-gradient(var(--kpi-tone, var(--accent)) calc(var(--kpi-pct, 0) * 1%), var(--border) 0);
+}
+.kpi-ring::after {
+  content: ''; width: 31px; height: 31px; border-radius: 50%; background: var(--surface);
+}
+
+/* ── Dashboard layout ─────────────────────────────────────────────────────────
+   Each row is its own independent 2-column grid rather than one grid spanning
+   the page, specifically so a conditionally-omitted panel (Recent Activity,
+   gated on audit:read) can't shift every later item into the wrong column via
+   implicit auto-placement. The `:only-child` rule is what makes the dashboard
+   spec's "Panel omitted for permission" scenario hold: when a row's partner
+   panel is absent, the remaining one spans full width instead of leaving an
+   empty column beside it. See design.md D2. ─────────────────────────────── */
+.dash-grid { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.dash-row {
+  display: grid; grid-template-columns: minmax(0, 1fr) 384px; gap: 16px;
+  align-items: stretch;
+}
+.dash-row > *:only-child { grid-column: 1 / -1; }
+
+/* Three side-by-side cards (Project Summary, Active Projects, Needs
+   Attention) rather than two stacked in a .dash-split under a rail card —
+   stacking them meant Active Projects' header could never land on the same
+   line as Project Summary's or Needs Attention's, since it wasn't a
+   top-level row item. The rail column here matches .dash-row's 384px so the
+   two rows' right edges still line up. */
+.dash-row-3 {
+  display: grid; grid-template-columns: minmax(0, 320px) minmax(0, 1fr) 384px;
+  gap: 16px; align-items: stretch;
+}
+
+@media (max-width: 1180px) {
+  .dash-row { grid-template-columns: minmax(0, 1fr); }
+  .dash-row-3 { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Dashboard's 5-tile KPI row: the average-progress tile (carrying the
+   completion ring) runs wider than the other four — design.md D7. The base
+   .kpi-row above stays an even auto-fit grid for the five other pages that
+   reuse it with varying tile counts. */
+.dash-kpi-row { grid-template-columns: repeat(4, 1fr) 1.4fr; margin-bottom: 0; }
+/* ~10% shorter than the base .kpi tile, scoped to the dashboard only. */
+.dash-kpi-row .kpi { padding-top: 13px; padding-bottom: 13px; }
+.dash-kpi-row .kpi-icon { width: 34px; height: 34px; }
+.dash-kpi-row .kpi-ring { width: 38px; height: 38px; }
+.dash-kpi-row .kpi-ring::after { width: 28px; height: 28px; }
+@media (max-width: 900px) {
+  .dash-kpi-row { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ── Panel header icon tile ───────────────────────────────────────────────── */
+.card-head-title { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
+.card-head-title h3 { margin: 0; }
+.panel-icon {
+  width: 30px; height: 30px; border-radius: 9px; flex: none;
+  display: grid; place-items: center; background: var(--slate-soft); color: var(--text-2);
+  margin-top: 1px;
+}
+.panel-icon.is-accent { background: var(--accent-soft); color: var(--accent); }
+.panel-icon.is-red    { background: var(--red-soft);    color: var(--red); }
+.panel-link { display: inline-flex; align-items: center; gap: 2px; }
+
+/* ── Portfolio status donut centre label ──────────────────────────────────── */
+/* Chart left, distribution list right — was stacked top/bottom; side by side
+   cuts the card's combined content height by roughly a quarter. */
+.portfolio-body { display: flex; align-items: center; gap: 18px; margin-top: 4px; }
+.portfolio-body .donut-wrap { flex: none; width: 150px; }
+.portfolio-body .chart-legend { flex: 1; min-width: 0; margin-top: 0; }
+
+.donut-wrap { position: relative; }
+.donut-center {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; pointer-events: none;
+}
+.donut-center strong { font-size: 18px; font-weight: 700; line-height: 1.1; }
+.donut-center span { font-size: 10px; color: var(--text-muted); }
+
+/* ── Needs-attention icon tile ────────────────────────────────────────────── */
+.attention-icon {
+  width: 32px; height: 32px; border-radius: 9px; flex: none;
+  display: grid; place-items: center; background: var(--red-soft); color: var(--red);
+}
+
+/* ── Date range control (dashboard heading action) ────────────────────────── */
+.date-range-trigger { display: inline-flex; align-items: center; gap: 6px; }
+
+/* ── Stay on Track promo card ─────────────────────────────────────────────── */
+/* Stay on Track promo card — adapted off the reference's .stay-on-track:
+   same decorative-wave/illustration/pill-CTA structure, hardcoded colours
+   swapped for theme tokens so it survives dark mode. */
+.promo-card {
+  position: relative; display: flex; align-items: center; justify-content: space-between;
+  min-height: 145px; padding: 18px; overflow: hidden; isolation: isolate;
+  background: var(--gradient-subtle); border-color: var(--border);
+}
+.promo-card::before {
+  content: ''; position: absolute; z-index: -1;
+  width: 190px; height: 100px; right: -35px; bottom: -65px; border-radius: 50%;
+  background: color-mix(in srgb, var(--surface) 65%, transparent);
+  transform: rotate(-15deg);
+}
+.promo-card::after {
+  content: ''; position: absolute; z-index: -1;
+  width: 140px; height: 75px; right: 55px; bottom: -48px; border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+.promo-content { position: relative; z-index: 2; max-width: 65%; }
+.promo-content h3 { font-size: 16px; margin: 0 0 7px; }
+.promo-content p { font-size: 12px; line-height: 1.5; color: var(--text-secondary); margin: 0 0 12px; }
+
+.promo-cta {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 13px; border: 0; border-radius: 999px;
+  background: var(--accent); color: #fff; font-size: 11px; font-weight: 600;
+  text-decoration: none; transition: background .2s ease, box-shadow .2s ease, transform .2s ease;
+}
+.promo-cta:hover {
+  background: var(--accent-dark); color: #fff;
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--accent) 35%, transparent);
+  transform: translateY(-2px);
+}
+.promo-illustration {
+  position: relative; z-index: 2; flex: none;
+  width: 68px; height: 68px; border-radius: 18px;
+  display: grid; place-items: center; background: var(--surface);
+  color: var(--accent); box-shadow: var(--shadow-xs);
+}
+
+@media (max-width: 1100px) {
+  .promo-card { min-height: 135px; padding: 14px; }
+  .promo-illustration { width: 56px; height: 56px; }
+}
+
+.card-head.bare { border-bottom: 0; padding-bottom: 6px; align-items: flex-start; }
+.card-head.bare h3 { font-size: 15px; margin: 0; }
+.chart-legend-note {
+  font-size: 10.5px; color: var(--text-3); text-transform: uppercase;
+  letter-spacing: .05em; white-space: nowrap;
+}
+
+/* Recharts tooltips render as plain DOM, so they take the same tokens. */
+.chart-tip {
+  background: var(--surface); border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm); box-shadow: var(--shadow);
+  padding: 9px 11px; display: flex; flex-direction: column; gap: 3px;
+  font-size: 12px; max-width: 280px;
+}
+.chart-tip strong { font-size: 12.5px; }
+.chart-tip-row { display: flex; gap: 6px; align-items: baseline; color: var(--text-2); }
+.chart-tip-row code { font-family: var(--mono); font-size: 11px; color: var(--text); }
+.chart-tip-row em { margin-left: auto; font-style: normal; color: var(--text-3); font-size: 11px; }
+
+.chart-legend { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; }
+.chart-legend li { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-2); }
+.chart-legend b { margin-left: auto; color: var(--text); font-weight: 650; }
+.legend-swatch { width: 9px; height: 9px; border-radius: 2px; flex: none; }
+
+/* ── Quick actions: two-column tile grid (dashboard spec requirement) ────── */
+.rail-card h3 { font-size: 14px; margin: 0; }
+.rail-sub { margin: 3px 0 12px; }
+/* Title-only tiles (no hint line) — a compact single row per tile rather
+   than the taller icon-on-top-of-two-lines layout that needed the hint.
+   The card is row-stretched to match Delivery Pressure's height (.dash-row,
+   align-items: stretch); flex-centring the tile grid inside it turns any
+   leftover height into balanced padding instead of dead space at the
+   bottom. */
+.quick-actions-card { display: flex; flex-direction: column; }
+.quick-actions-card .quick-grid { flex: 1; align-content: center; }
+.quick-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 2px; }
+.quick-action {
+  display: flex; align-items: center; gap: 9px;
+  padding: 9px 10px; border-radius: var(--radius-sm); text-decoration: none;
+  color: inherit; border: 1px solid var(--border); transition: background .15s, border-color .15s;
+}
+.quick-action:hover { background: var(--surface-2); border-color: var(--border-strong); }
+.quick-icon {
+  width: 26px; height: 26px; border-radius: var(--radius-sm); flex: none;
+  display: grid; place-items: center;
+  background: var(--accent-soft); color: var(--accent-dark);
+}
+.quick-text {
+  flex: 1; min-width: 0; font-size: 12.5px; font-weight: 600;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.quick-chevron { flex: none; color: var(--text-3); }
+
+@media (max-width: 420px) {
+  .quick-grid { grid-template-columns: 1fr; }
+}
+
+/* ── Needs-attention list ────────────────────────────────────────────────── */
+.attention-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.attention-row {
+  display: flex; align-items: center; gap: 10px; padding: 8px 10px;
+  border-radius: var(--radius-sm); text-decoration: none; color: inherit;
+}
+.attention-row:hover { background: var(--surface-2); }
+.attention-main { display: grid; gap: 1px; min-width: 0; }
+.attention-main strong {
+  font-size: 12.5px; font-weight: 600;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.attention-main small { font-size: 11px; }
+.attention-flag {
+  margin-left: auto; flex: none; font-size: 11px; font-weight: 600;
+  padding: 2px 7px; border-radius: 999px;
+  background: var(--amber-soft); color: var(--amber);
+}
+.attention-flag.is-overdue { background: var(--red-soft); color: var(--red); }
+
+/* ── Active-projects list ────────────────────────────────────────────────── */
+.active-list { list-style: none; margin: 0; padding: 0; display: grid; }
+.active-row {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(90px, 148px) auto;
+  align-items: center; gap: 11px; padding: 10px 8px;
+  border-radius: var(--radius-sm); text-decoration: none; color: inherit;
+  border-top: 1px solid var(--border-light);
+}
+.active-list li:first-child .active-row { border-top: 0; }
+.active-row:hover { background: var(--surface-2); }
+.active-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; background: var(--border-strong); }
+.active-main { display: grid; gap: 1px; min-width: 0; }
+.active-main strong {
+  font-size: 12.5px; font-weight: 600;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.active-main small { font-size: 11px; color: var(--text-muted); }
+.active-pct { font-size: 12px; font-weight: 650; color: var(--text-2); min-width: 34px; text-align: right; }
+
+@media (max-width: 560px) {
+  .active-row { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .active-row .progress { display: none; }
+}
+
+/* ── Recent-activity feed ────────────────────────────────────────────────── */
+.activity-feed { list-style: none; margin: 0; padding: 0; display: grid; }
+.activity-row { display: flex; align-items: flex-start; gap: 9px; padding-bottom: 8px; }
+.activity-feed li:last-child .activity-row { padding-bottom: 0; }
+
+/* Timeline rail: icon circles joined by a connecting line, matching the
+   same marker/line pattern the SOP workflow journey uses (.journey-marker). */
+.activity-marker { display: flex; flex-direction: column; align-items: center; flex: none; }
+.activity-rail { width: 1px; flex: 1; min-height: 8px; background: var(--border-light); margin-top: 3px; }
+.activity-icon {
+  width: 19px; height: 19px; border-radius: 50%; flex: none;
+  display: grid; place-items: center; font-size: 9px; line-height: 1;
+  background: var(--slate-soft); color: var(--text-2);
+}
+.activity-icon.is-create  { background: var(--accent-soft); color: var(--accent); }
+.activity-icon.is-publish { background: var(--green-soft);  color: var(--green); }
+.activity-icon.is-update  { background: var(--amber-soft);  color: var(--amber); }
+.activity-icon.is-delete  { background: var(--red-soft);    color: var(--red); }
+.activity-text { min-width: 0; display: grid; gap: 0; padding-top: 1px; }
+.activity-text strong { font-size: 12px; font-weight: 550; line-height: 1.25; }
+.activity-when { margin-left: auto; flex: none; font-size: 10.5px; color: var(--text-muted); white-space: nowrap; padding-top: 1px; }
+
+/* ── Role cards ──────────────────────────────────────────────────────────── */
+.role-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+.role-card {
+  text-align: left; background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 15px 16px 0; cursor: pointer;
+  display: flex; flex-direction: column; gap: 9px; font: inherit; color: inherit;
+  transition: border-color .15s, box-shadow .15s, transform .15s;
+}
+.role-card:hover { border-color: var(--border-strong); transform: translateY(-1px); box-shadow: var(--shadow); }
+.role-card.is-selected { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+
+.role-card-head { display: flex; align-items: center; gap: 11px; }
+.role-mark {
+  width: 32px; height: 32px; border-radius: 9px; flex: none;
+  display: grid; place-items: center; font-weight: 700; font-size: 14px;
+}
+.tone-mark-accent { background: var(--accent-soft); color: var(--accent-dark); }
+.tone-mark-green  { background: var(--green-soft);  color: var(--green); }
+.tone-mark-amber  { background: var(--amber-soft);  color: var(--amber); }
+.tone-mark-red    { background: var(--red-soft);    color: var(--red); }
+.tone-mark-violet { background: var(--violet-soft); color: var(--violet); }
+.tone-mark-slate  { background: var(--slate-soft);  color: var(--slate); }
+
+.role-card-title { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.role-card-title strong { font-size: 14px; font-weight: 650; }
+.role-system {
+  font-size: 9.5px; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--text-3); border: 1px solid var(--border); border-radius: 4px; padding: 1px 4px;
+}
+.role-card-desc {
+  margin: 0; font-size: 12px; line-height: 1.5; color: var(--text-2);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  min-height: 36px;
+}
+
+.role-pills { display: flex; gap: 6px; flex-wrap: wrap; }
+.role-pill {
+  font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 999px;
+  background: var(--slate-soft); color: var(--slate);
+}
+.role-pill.is-full       { background: var(--green-soft);  color: var(--green); }
+.role-pill.is-manage     { background: var(--accent-soft); color: var(--accent-dark); }
+.role-pill.is-contribute { background: var(--amber-soft);  color: var(--amber); }
+.role-pill.is-read-only  { background: var(--slate-soft);  color: var(--slate); }
+.role-pill.is-scope      { background: transparent; color: var(--text-2); border: 1px solid var(--border); }
+
+.role-modules { display: flex; gap: 4px; flex-wrap: wrap; }
+.role-module {
+  width: 21px; height: 21px; border-radius: 5px; flex: none;
+  display: grid; place-items: center; font-size: 10px;
+  background: var(--surface-2); color: var(--text-3); opacity: .45;
+}
+.role-module.is-on { background: var(--accent-soft); color: var(--accent-dark); opacity: 1; }
+
+.role-card-foot {
+  display: flex; justify-content: space-between; align-items: center;
+  border-top: 1px solid var(--border); margin-top: auto;
+  padding: 9px 0; font-size: 11.5px; color: var(--text-3);
+}
+
+.cap-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
+.cap-list li { display: flex; align-items: center; gap: 9px; font-size: 13px; }
+.cap-mark {
+  width: 18px; height: 18px; border-radius: 50%; flex: none;
+  display: grid; place-items: center; font-size: 11px; font-weight: 700;
+}
+.cap-list .is-yes .cap-mark { background: var(--green-soft); color: var(--green); }
+.cap-list .is-no  .cap-mark { background: var(--slate-soft); color: var(--text-3); }
+.cap-list .is-no { color: var(--text-3); }
+
+.perm-module { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; }
+.perm-module-head { display: flex; align-items: center; gap: 7px; margin-bottom: 7px; }
+.perm-module-head strong { font-size: 12.5px; }
+.perm-icon {
+  width: 20px; height: 20px; border-radius: 5px; flex: none; display: grid; place-items: center;
+  background: var(--accent-soft); color: var(--accent-dark); font-size: 10px;
+}
+.perm-actions { display: flex; gap: 5px; flex-wrap: wrap; }
+.perm-action {
+  font-size: 10.5px; padding: 2px 7px; border-radius: 4px;
+  background: var(--surface-2); color: var(--text-2); border: 1px solid var(--border);
+}
+
+/* ── User management ─────────────────────────────────────────────────────── */
+.user-cell { display: flex; align-items: center; gap: 10px; }
+.user-avatar, .invite-avatar, .mini-avatar {
+  width: 28px; height: 28px; border-radius: 50%; flex: none;
+  display: grid; place-items: center; font-size: 12px; font-weight: 650;
+  background: var(--accent-soft); color: var(--accent-dark);
+}
+.user-cell small { display: block; font-size: 11px; }
+.row-actions { display: flex; gap: 6px; justify-content: flex-end; }
+
+.state-pill {
+  display: inline-block; font-size: 11px; font-weight: 600;
+  padding: 2px 9px; border-radius: 999px;
+}
+.state-pill.is-active   { background: var(--green-soft); color: var(--green); }
+.state-pill.is-inactive { background: var(--slate-soft); color: var(--text-3); }
+
+.btn-success { background: var(--green); border-color: var(--green); }
+.btn-success:hover:not(:disabled) { background: #0f7a4d; }
+.icon-btn.is-danger:hover { background: var(--red-soft); color: var(--red); }
+.field-action { margin-left: 8px; font-size: 11.5px; font-weight: 600; }
+
+.team-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
+.team-card {
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 12px 13px; display: flex; flex-direction: column; gap: 7px;
+}
+.team-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.team-card-head strong { font-size: 13px; }
+.team-card-actions { display: flex; gap: 2px; }
+.team-card-desc {
+  margin: 0; font-size: 11.5px; line-height: 1.5; color: var(--text-2);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.team-card-foot {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; margin-top: auto; padding-top: 4px;
+}
+.chip-row { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+.mini-avatar { width: 22px; height: 22px; font-size: 10px; }
+.mini-avatar.is-more { background: var(--slate-soft); color: var(--text-3); }
+.chip {
+  font-size: 11.5px; padding: 2px 9px; border-radius: 999px;
+  background: var(--surface-2); border: 1px solid var(--border); color: var(--text-2);
+}
+.chip.is-muted { opacity: .5; }
+.team-members { margin-top: 6px; display: grid; gap: 6px; }
+
+.invite-user { display: flex; align-items: center; gap: 11px; margin-bottom: 14px; }
+.invite-user strong { display: block; font-size: 13.5px; }
+.invite-user small { font-size: 11.5px; }
+.invite-avatar { width: 34px; height: 34px; font-size: 14px; }
+
+.temp-pass {
+  border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+  background: var(--surface-2); padding: 12px 14px; margin-bottom: 12px;
+}
+.temp-pass-label {
+  display: block; font-size: 10.5px; text-transform: uppercase;
+  letter-spacing: .05em; color: var(--text-3); margin-bottom: 7px; font-weight: 600;
+}
+.temp-pass-row { display: flex; align-items: center; gap: 10px; }
+.temp-pass-row code {
+  font-family: var(--mono); font-size: 17px; font-weight: 600;
+  letter-spacing: .06em; flex: 1; user-select: all;
+}
+
+.danger-note {
+  background: var(--red-soft); border-left: 3px solid var(--red);
+  padding: 11px 13px; border-radius: var(--radius-sm);
+  font-size: 13px; margin-bottom: 14px; line-height: 1.5;
+}
+.history-breakdown {
+  list-style: none; margin: 10px 0 14px; padding: 0;
+  display: flex; gap: 7px; flex-wrap: wrap;
+}
+.history-breakdown li {
+  font-size: 11.5px; padding: 3px 9px; border-radius: 999px;
+  background: var(--surface-2); border: 1px solid var(--border); color: var(--text-2);
+}
+.history-breakdown b { color: var(--text); }
+
+/* ── Clickable data rows ─────────────────────────────────────────────────── */
+.data-table .row-link { cursor: pointer; transition: background .12s; }
+.data-table .row-link:hover { background: var(--surface-2); }
+.data-table .row-link:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.data-table .row-link td:first-child { position: relative; }
+.data-table .row-link:hover td:first-child::before {
+  content: ''; position: absolute; inset: 0 auto 0 0; width: 2px; background: var(--accent);
+}
+
+/* ── Project hero ────────────────────────────────────────────────────────── */
+.project-hero {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 18px 20px; margin-bottom: 16px;
+  position: relative; overflow: hidden;
+}
+.project-hero::before {
+  content: ''; position: absolute; inset: 0 0 auto 0; height: 3px;
+  background: linear-gradient(90deg, var(--accent), var(--violet));
+}
+.back-link { font-size: 11.5px; color: var(--text-3); text-decoration: none; }
+.back-link:hover { color: var(--accent); }
+.project-hero-main {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 16px; margin-top: 8px;
+}
+.project-hero-title { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.project-hero-title h2 { font-size: 20px; font-weight: 650; letter-spacing: -.02em; margin: 0; }
+.project-hero-pct { text-align: right; flex: none; }
+.project-hero-pct span { display: block; font-size: 26px; font-weight: 700; letter-spacing: -.025em; }
+.project-hero-desc { margin: 9px 0 0; font-size: 13px; color: var(--text-2); max-width: 86ch; line-height: 1.55; }
+.hero-facts {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px 20px; margin: 16px 0 0; padding-top: 14px; border-top: 1px solid var(--border);
+}
+.hero-facts dt {
+  font-size: 10px; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--text-3); font-weight: 600;
+}
+.hero-facts dd { margin: 3px 0 0; font-size: 13px; }
+
+/* ── Segmented stage bar ─────────────────────────────────────────────────── */
+.progress-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.progress-card-head h3 { margin: 0; font-size: 15px; }
+.progress-card-figure { text-align: right; flex: none; }
+.progress-card-figure .progress-figure {
+  display: block; font-size: 28px; font-weight: 700; letter-spacing: -.025em;
+}
+
+.stage-bar-wrap { margin: 16px 0 4px; }
+.stage-bar { display: flex; gap: 3px; height: 10px; border-radius: 999px; }
+.stage-seg {
+  border: 0; padding: 0; cursor: pointer; position: relative;
+  border-radius: 3px; min-width: 8px; transition: transform .12s, filter .12s;
+}
+.stage-bar > .stage-seg:first-child { border-radius: 999px 3px 3px 999px; }
+.stage-bar > .stage-seg:last-child  { border-radius: 3px 999px 999px 3px; }
+.stage-seg:hover, .stage-seg.is-hovered { transform: scaleY(1.5); filter: brightness(1.08); }
+.stage-seg:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+.seg-complete { background: var(--green); }
+.seg-progress { background: var(--accent); }
+.seg-hold     { background: var(--red); }
+.seg-blocked  { background: var(--amber); }
+.seg-pending  { background: var(--border); }
+
+.stage-seg-tip {
+  position: absolute; bottom: calc(100% + 11px); left: 50%; transform: translateX(-50%);
+  background: var(--surface); border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm); box-shadow: var(--shadow);
+  padding: 9px 11px; display: flex; flex-direction: column; gap: 3px;
+  white-space: nowrap; z-index: 20; text-align: left; pointer-events: none;
+}
+.stage-seg-tip strong { font-size: 12.5px; }
+.tip-status { font-size: 11px; font-weight: 600; background: none; }
+.tip-status.seg-complete { color: var(--green); }
+.tip-status.seg-progress { color: var(--accent); }
+.tip-status.seg-hold     { color: var(--red); }
+.tip-status.seg-blocked  { color: var(--amber); }
+.tip-status.seg-pending  { color: var(--text-3); }
+.tip-owner, .tip-due { font-size: 11.5px; color: var(--text-2); }
+.tip-owner b { color: var(--text); }
+
+.stage-rail {
+  list-style: none; display: flex; gap: 14px; flex-wrap: wrap;
+  margin: 14px 0 0; padding: 0;
+}
+.rail-step {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 11.5px; color: var(--text-3); background: none;
+}
+.rail-step.is-hovered { color: var(--text); }
+.rail-step.seg-complete, .rail-step.seg-progress { color: var(--text-2); }
+.rail-step .rail-mark { font-size: 9px; }
+.rail-step.seg-complete .rail-mark { color: var(--green); }
+.rail-step.seg-progress .rail-mark { color: var(--accent); }
+.rail-step.seg-hold     .rail-mark { color: var(--red); }
+.rail-step.seg-blocked  .rail-mark { color: var(--amber); }
+
+.mini-stats {
+  display: grid; gap: 10px; margin-top: 18px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+.mini-stat {
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 11px 13px; text-align: center; display: grid; gap: 5px;
+}
+.mini-label {
+  font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--text-3); font-weight: 600;
+}
+.mini-value { font-size: 20px; font-weight: 680; letter-spacing: -.02em; }
+.mini-value small { font-size: 12px; font-weight: 500; color: var(--text-3); }
+.mini-value.is-text { font-size: 13.5px; font-weight: 600; line-height: 1.35; }
+.mini-stat.is-accent .mini-value { color: var(--accent); }
+.mini-stat.is-green  .mini-value { color: var(--green); }
+
+.breakdown-row {
+  display: grid; gap: 10px; margin-bottom: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+}
+.breakdown-tile {
+  border: 1px solid var(--border); border-left-width: 3px;
+  border-radius: var(--radius-sm); padding: 10px 12px; display: grid; gap: 2px;
+}
+.breakdown-value { font-size: 19px; font-weight: 680; letter-spacing: -.02em; }
+.breakdown-label { font-size: 11px; color: var(--text-3); }
+.tone-tile-green   { border-left-color: var(--green); }
+.tone-tile-accent  { border-left-color: var(--accent); }
+.tone-tile-amber   { border-left-color: var(--amber); }
+.tone-tile-red     { border-left-color: var(--red); }
+.tone-tile-neutral { border-left-color: var(--border-strong); }
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}

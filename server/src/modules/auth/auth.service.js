@@ -1,7 +1,7 @@
 import { userModel } from '../../models/user.model.js';
 import { roleModel } from '../../models/role.model.js';
 import { refreshTokenModel } from '../../models/refreshToken.model.js';
-import { verifyPasswordSync } from '../../utils/password.js';
+import { verifyPasswordSync, hashPasswordSync } from '../../utils/password.js';
 import { ApiError } from '../../utils/ApiError.js';
 import {
   signAccessToken,
@@ -19,6 +19,8 @@ function present(user) {
     team: user.team,
     clientName: user.clientName,
     isActive: user.isActive,
+    // The UI blocks the app behind a change-password prompt while this is true.
+    mustChangePassword: Boolean(user.mustChangePassword),
     role: {
       id: user.roleId,
       key: user.roleKey,
@@ -53,6 +55,35 @@ export const authService = {
       accessToken: signAccessToken(user),
       refreshToken: issueRefreshToken(user.id, userAgent),
     };
+  },
+
+  /**
+   * Clears a temporary password. Every other session is revoked, so a password
+   * handed over by an admin stops working everywhere the moment it is replaced.
+   */
+  changePassword(actorId, { currentPassword, newPassword }) {
+    const user = userModel.findById(actorId);
+    if (!user) throw ApiError.unauthorized('Not signed in', 'NOT_AUTHENTICATED');
+
+    const withSecret = userModel.findByEmailWithSecret(user.email);
+    if (!verifyPasswordSync(currentPassword, withSecret.passwordHash)) {
+      throw ApiError.badRequest('Current password is incorrect', { field: 'currentPassword' }, 'INVALID_PASSWORD');
+    }
+    if (verifyPasswordSync(newPassword, withSecret.passwordHash)) {
+      throw ApiError.badRequest(
+        'Choose a password you have not used here before',
+        { field: 'newPassword' },
+        'PASSWORD_REUSED',
+      );
+    }
+
+    const after = userModel.update(user.id, {
+      passwordHash: hashPasswordSync(newPassword),
+      mustChangePassword: false,
+    });
+    refreshTokenModel.revokeAllForUser(user.id);
+
+    return { user: present(after) };
   },
 
   refresh(rawRefreshToken, userAgent) {

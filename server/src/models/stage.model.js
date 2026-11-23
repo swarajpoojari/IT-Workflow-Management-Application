@@ -11,9 +11,14 @@ const cast = (row) => {
 
 const SELECT_STAGE = `
   SELECT s.*, u.full_name AS assignee_name, u.email AS assignee_email,
+         t.name AS owning_team_name, t.category AS owning_team_category,
+         p.code AS project_code, p.name AS project_name,
+         p.client_name AS project_client_name, p.status AS project_status,
          (SELECT COUNT(*) FROM stage_documents d WHERE d.project_stage_id = s.id) AS document_count
     FROM project_workflow_stages s
-    LEFT JOIN users u ON u.id = s.assigned_to`;
+    JOIN projects p ON p.id = s.project_id
+    LEFT JOIN users u ON u.id = s.assigned_to
+    LEFT JOIN teams t ON t.id = s.owning_team_id`;
 
 export const stageModel = {
   findById(id) {
@@ -34,9 +39,10 @@ export const stageModel = {
       .prepare(
         `INSERT INTO project_workflow_stages
            (project_id, sop_stage_id, name, description, sequence, client_visible,
-            requires_document, stage_type, requires_signoff, status, due_date)
+            requires_document, stage_type, requires_signoff, status, due_date, owning_team_id)
          SELECT ?, ss.id, ss.name, ss.description, ss.sequence, ss.client_visible,
-                ss.requires_document, ss.stage_type, ss.requires_signoff, 'NOT_STARTED', NULL
+                ss.requires_document, ss.stage_type, ss.requires_signoff, 'NOT_STARTED', NULL,
+                ss.default_owner_team_id
            FROM sop_stages ss
           WHERE ss.sop_version_id = ?
           ORDER BY ss.sequence`,
@@ -74,11 +80,12 @@ export const stageModel = {
   },
 
   // Assignment and scheduling only; cannot touch status.
-  updateAssignment(id, { assignedTo, dueDate, updatedBy }) {
+  updateAssignment(id, { assignedTo, dueDate, owningTeamId, updatedBy }) {
     const sets = [];
     const params = { id, updatedBy };
     if (assignedTo !== undefined) { sets.push('assigned_to = @assignedTo'); params.assignedTo = assignedTo; }
     if (dueDate !== undefined) { sets.push('due_date = @dueDate'); params.dueDate = dueDate; }
+    if (owningTeamId !== undefined) { sets.push('owning_team_id = @owningTeamId'); params.owningTeamId = owningTeamId; }
     if (!sets.length) return stageModel.findById(id);
     sets.push('updated_by = @updatedBy', "updated_at = datetime('now')");
     getDb().prepare(`UPDATE project_workflow_stages SET ${sets.join(', ')} WHERE id = @id`).run(params);

@@ -79,6 +79,12 @@ const initialState = {
   templates: [],
   current: null,
   status: 'idle',
+  // Deliberately separate from `status` above (which is fetchTemplates's — the
+  // *list* — status). The builder page needs to know when its one template is
+  // loading, independent of the library's list fetch; sharing one field meant
+  // the list's fulfil could flip status to 'succeeded' while the template
+  // itself was still in flight, skipping the spinner and rendering nothing.
+  templateStatus: 'idle',
   error: null,
   mutationStatus: 'idle',
   lastPublished: null,
@@ -105,20 +111,36 @@ const sopSlice = createSlice({
         state.error = action.payload;
       })
 
-      .addCase(fetchTemplate.pending, (state) => { state.status = 'loading'; state.error = null; })
+      .addCase(fetchTemplate.pending, (state) => { state.templateStatus = 'loading'; state.error = null; })
       .addCase(fetchTemplate.fulfilled, (state, action) => {
-        state.status = 'succeeded';
+        state.templateStatus = 'succeeded';
         state.current = action.payload;
       })
       .addCase(fetchTemplate.rejected, (state, action) => {
-        state.status = 'failed';
+        state.templateStatus = 'failed';
         state.error = action.payload;
       })
 
       .addCase(publishTemplate.fulfilled, (state, action) => {
         state.mutationStatus = 'succeeded';
         state.lastPublished = action.payload;
+      })
+
+      // New template isn't fetched again on the library page unless it
+      // happens to remount, so it's added here directly — the builder can
+      // navigate straight to it without the library going stale meanwhile.
+      .addCase(createTemplate.fulfilled, (state, action) => {
+        state.mutationStatus = 'succeeded';
+        state.templates.push(action.payload);
       });
+
+    // addCase only keeps the *last* registration for a given action type —
+    // it does not throw on a second one, it silently discards the first.
+    // publishTemplate and createTemplate each already have a fulfilled case
+    // above that does more than set mutationStatus, so re-adding a generic
+    // one for them here would quietly win and wipe out lastPublished / the
+    // templates push. Only the thunks with no case yet get one.
+    const genericFulfilled = mutations.filter((t) => t !== publishTemplate && t !== createTemplate);
 
     for (const thunk of mutations) {
       builder
@@ -127,6 +149,14 @@ const sopSlice = createSlice({
           state.mutationStatus = 'failed';
           state.error = action.payload;
         });
+    }
+    for (const thunk of genericFulfilled) {
+      // Every mutation thunk needs its own 'succeeded' case — relying on the
+      // *next* thunk's .pending to clear a previous 'loading' never actually
+      // clears it after the session's last mutation, which left every
+      // busy-gated button (Add/Edit/Delete stage, …) stuck disabled from the
+      // first successful save onward.
+      builder.addCase(thunk.fulfilled, (state) => { state.mutationStatus = 'succeeded'; });
     }
   },
 });
@@ -137,6 +167,7 @@ export default sopSlice.reducer;
 export const selectTemplates = (state) => state.sop.templates;
 export const selectCurrentTemplate = (state) => state.sop.current;
 export const selectSopStatus = (state) => state.sop.status;
+export const selectSopTemplateStatus = (state) => state.sop.templateStatus;
 export const selectSopError = (state) => state.sop.error;
 export const selectSopMutationStatus = (state) => state.sop.mutationStatus;
 export const selectLastPublished = (state) => state.sop.lastPublished;

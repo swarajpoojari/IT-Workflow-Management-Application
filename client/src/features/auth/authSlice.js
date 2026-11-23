@@ -28,6 +28,16 @@ export const bootstrapSession = createAsyncThunk('auth/bootstrap', async (_, thu
   }
 });
 
+export const changePassword = createAsyncThunk('auth/changePassword', async (payload, thunkApi) => {
+  try {
+    const { data } = await api.post(endpoints.auth.changePassword, payload);
+    setAccessToken(data.accessToken);
+    return data.user;
+  } catch (error) {
+    return thunkApi.rejectWithValue(toRejection(error));
+  }
+});
+
 export const logout = createAsyncThunk('auth/logout', async (_, thunkApi) => {
   try {
     await api.post(endpoints.auth.logout);
@@ -65,6 +75,18 @@ const authSlice = createSlice({
         state.status = 'failed';
         state.user = null;
         state.error = action.payload ?? { message: 'Login failed' };
+      })
+      .addCase(changePassword.pending, (state) => {
+        state.status = 'loading';
+        state.error = null;
+      })
+      .addCase(changePassword.fulfilled, (state, action) => {
+        state.status = 'succeeded';
+        state.user = action.payload;
+      })
+      .addCase(changePassword.rejected, (state, action) => {
+        state.status = 'failed';
+        state.error = action.payload ?? { message: 'Could not change the password' };
       })
       .addCase(bootstrapSession.pending, (state) => {
         state.bootstrapStatus = 'loading';

@@ -15,6 +15,7 @@ import { ClientViewPage } from '../pages/ClientViewPage.jsx';
 import { ReportsPage } from '../pages/ReportsPage.jsx';
 import { SettingsPage } from '../pages/SettingsPage.jsx';
 import { RolePreviewPage } from '../pages/RolePreviewPage.jsx';
+import { SopLibraryPage } from '../pages/SopLibraryPage.jsx';
 import { SopBuilderPage } from '../pages/SopBuilderPage.jsx';
 import { UserManagementPage } from '../pages/UserManagementPage.jsx';
 import { AuditLogPage } from '../pages/AuditLogPage.jsx';
@@ -63,6 +64,18 @@ export function AppRoutes() {
         />
         <Route
           path="sop"
+          element={<RoleGuard require={['sop', 'update']}><SopLibraryPage /></RoleGuard>}
+        />
+        {/* Static segment first: creating an SOP uses the builder chrome.
+            This route has no :id segment, so useParams().id is undefined
+            here — isNew is passed explicitly rather than inferred from a
+            param that only exists on the sibling route below. */}
+        <Route
+          path="sop/new"
+          element={<RoleGuard require={['sop', 'create']}><SopBuilderPage isNew /></RoleGuard>}
+        />
+        <Route
+          path="sop/:id"
           element={<RoleGuard require={['sop', 'update']}><SopBuilderPage /></RoleGuard>}
         />
         <Route

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { usersService } from './users.service.js';
+import { usersService, teamsService } from './users.service.js';
 import { authenticate } from '../../middleware/authenticate.js';
 import { requirePermission } from '../../middleware/authorize.js';
 import { validate } from '../../middleware/validate.js';
@@ -7,7 +7,10 @@ import { asyncHandler } from '../../utils/asyncHandler.js';
 import { parsePagination, paginated } from '../../utils/pagination.js';
 import { recordAudit, diff } from '../../services/audit.service.js';
 import { AUDIT_ACTION, AUDIT_ENTITY, MODULES, ACTIONS } from '../../config/constants.js';
-import { idParam, createUserSchema, updateUserSchema, listUsersSchema, reassignSchema } from './users.schema.js';
+import {
+  idParam, createUserSchema, updateUserSchema, listUsersSchema, reassignSchema,
+  teamSchema, updateTeamSchema,
+} from './users.schema.js';
 
 const router = Router();
 router.use(authenticate);
@@ -28,15 +31,17 @@ router.post(
   requirePermission(MODULES.USERS, ACTIONS.CREATE),
   validate({ body: createUserSchema }),
   asyncHandler((req, res) => {
-    const user = usersService.create(req.body);
+    const { user, temporaryPassword, invite } = usersService.create(req.user, req.body);
     recordAudit(req, {
       entityType: AUDIT_ENTITY.USER,
       entityId: user.id,
       action: AUDIT_ACTION.CREATE,
-      summary: `User ${user.email} created`,
+      summary: `User ${user.email} created and invited`,
       newValue: { email: user.email, fullName: user.fullName, roleId: user.roleId },
     });
-    res.status(201).json({ user });
+    // The temporary password is returned once, to the admin who created the
+    // account. It is never readable again from any endpoint.
+    res.status(201).json({ user, temporaryPassword, invite });
   }),
 );
 
@@ -93,6 +98,16 @@ router.patch(
   validate({ params: idParam }),
   asyncHandler((req, res) => {
     res.json({ user: usersService.activate(req.user, req.params.id) });
+  }),
+);
+
+router.delete(
+  '/:id',
+  requirePermission(MODULES.USERS, ACTIONS.DELETE),
+  validate({ params: idParam }),
+  asyncHandler((req, res) => {
+    const { user } = usersService.remove(req.user, req.params.id);
+    res.json({ deleted: true, user });
   }),
 );
 

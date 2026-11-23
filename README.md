@@ -38,8 +38,17 @@ The API stores data in a local SQLite file created on first run.
 
 ## Quick start
 
-Two terminals, two commands. No database server to install — the API uses a
-file-backed SQLite database that is created and seeded automatically.
+One terminal. No database server to install — the API uses a file-backed SQLite
+database that is created and seeded automatically.
+
+```bash
+npm run install:all   # root + server + client, once
+npm run dev           # API on :4000 and web app on :5173, together
+```
+
+Output is prefixed `[api]` and `[web]`, and either side failing stops both.
+
+Prefer separate terminals? The per-folder commands still work:
 
 ```bash
 # ── Terminal 1 — API on http://localhost:4000
@@ -80,13 +89,13 @@ No login needed for client tracking — see [Public tracking](#public-tracking-n
 ### Other commands
 
 ```bash
-cd server
-npm test              # 55 tests across 7 suites
+# from the repository root
+npm test              # 96 tests across 13 suites
+npm run build         # client production bundle
 npm run db:reset      # drop, recreate and reseed the database
-npm start             # production mode (no seeding, no hot reload)
+npm start             # API in production mode (no seeding, no hot reload)
 
 cd client
-npm run build         # production bundle
 npm run preview       # serve the built bundle
 ```
 
@@ -113,6 +122,18 @@ stage, and publish v2. Then reopen the existing project: still 5 stages, still
 **Rule 7 — auto-generation.** As Admin, go to *New project* and pick an SOP.
 The right-hand panel previews the exact stages that will be created, resolved
 from the latest **published** version. Save, and the board exists immediately.
+
+**User invites.** Creating a user takes no password. The API generates a
+temporary one, stores only its hash, emails it (printed to the API console in
+this environment) and returns it once so the admin can read it out. The account
+is held behind a change-password prompt until that temporary password is
+replaced, and replacing it revokes every existing session.
+
+**Deleting vs deactivating.** Delete is permanent and only possible for an
+account that has never acted. The moment a user appears in an append-only
+record — a status change, an upload, a sign-off, a bug event or an audit row —
+the API refuses with `409 HAS_HISTORY` and the UI offers deactivation instead,
+which blocks all access while leaving the history truthful.
 
 **Deactivation check.** As Admin, deactivate *Ivy Chen*. The API answers `409
 ACTIVE_ASSIGNMENTS` and the reassign modal opens listing the three stages that

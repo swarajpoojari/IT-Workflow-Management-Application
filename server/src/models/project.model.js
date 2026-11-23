@@ -165,10 +165,13 @@ export const projectModel = {
     return camelizeAll(
       getDb()
         .prepare(
-          `SELECT m.user_id, m.role_in_project, u.full_name, u.email, u.is_active, r.key AS role_key
+          `SELECT m.user_id, m.role_in_project, u.full_name, u.email, u.is_active,
+                  r.key AS role_key, r.name AS role_name,
+                  COALESCE(t.name, u.team) AS team
              FROM project_members m
              JOIN users u ON u.id = m.user_id
              JOIN roles r ON r.id = u.role_id
+             LEFT JOIN teams t ON t.id = u.team_id
             WHERE m.project_id = ?
             ORDER BY u.full_name`,
         )

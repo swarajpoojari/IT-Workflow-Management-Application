@@ -14,6 +14,7 @@ import { stagesService } from './modules/stages/stages.service.js';
 
 import authRoutes from './modules/auth/auth.routes.js';
 import userRoutes from './modules/users/users.routes.js';
+import teamRoutes from './modules/users/teams.routes.js';
 import roleRoutes from './modules/roles/roles.routes.js';
 import sopRoutes from './modules/sop/sop.routes.js';
 import projectRoutes from './modules/projects/projects.routes.js';
@@ -61,6 +62,7 @@ export function createApp() {
 
   app.use('/api/auth', authRoutes);
   app.use('/api/users', userRoutes);
+  app.use('/api/teams', teamRoutes);
   app.use('/api/roles', roleRoutes);
   app.use('/api/sop', sopRoutes);
   app.use('/api/projects', projectRoutes);

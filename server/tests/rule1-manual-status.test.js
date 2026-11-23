@@ -42,9 +42,11 @@ describe('Rule 1 · manual status only', () => {
 
   it('assigning an owner does not move the stage either', async () => {
     const admin = await login(app, 'admin');
+    // owningTeamId: null releases the stage from its SOP team. Team rules are
+    // not what this test is about, and this owner belongs to another team.
     const res = await as(app, admin.token)
       .patch(`/api/projects/${project.id}/stages/${stage.id}/assign`)
-      .send({ assignedTo: it_.user.id, dueDate: '2026-11-30' });
+      .send({ assignedTo: it_.user.id, owningTeamId: null, dueDate: '2026-11-30' });
 
     expect(res.status).toBe(200);
     expect(res.body.stage.status).toBe('NOT_STARTED');

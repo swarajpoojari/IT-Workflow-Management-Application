@@ -17,11 +17,16 @@ router.get(
   '/',
   requirePermission(MODULES.ROLES, ACTIONS.READ),
   asyncHandler((_req, res) => {
+    // memberCount drives the role cards; the module catalog lets the UI show
+    // coverage ("7 of 9 modules") without hard-coding a module list.
+    const counts = roleModel.memberCounts();
     const roles = roleModel.findAll().map((role) => ({
       ...role,
       permissions: roleModel.permissionsFor(role.id),
+      memberCount: counts[role.id]?.total ?? 0,
+      activeMemberCount: counts[role.id]?.active ?? 0,
     }));
-    res.json({ roles });
+    res.json({ roles, modules: permissionModel.modules() });
   }),
 );
 

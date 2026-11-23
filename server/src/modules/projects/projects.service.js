@@ -14,7 +14,12 @@ import { MODULES, ACTIONS, AUDIT_ENTITY, AUDIT_ACTION } from '../../config/const
 
 export const projectsService = {
   list(user, { status, search, limit, offset }) {
-    return projectModel.list({ scope: resolveScope(user), status, search, limit, offset });
+    const { items, total } = projectModel.list({ scope: resolveScope(user), status, search, limit, offset });
+    const clientVisibleOnly = Boolean(user.isClientScope);
+    // Same derived status/percent the Dashboard and the detail page already
+    // show, so the list's KPIs and its Status column agree with both of them
+    // rather than reading the raw, not-derived project.status column alone.
+    return { items: items.map((p) => ({ ...p, progress: projectProgress(p, { clientVisibleOnly }) })), total };
   },
 
   get(user, projectId) {

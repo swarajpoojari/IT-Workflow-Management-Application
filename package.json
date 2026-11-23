@@ -1,0 +1,23 @@
+{
+  "name": "it-workflow-management-application",
+  "version": "1.0.0",
+  "private": true,
+  "description": "IT Workflow Management System \u2014 root workspace scripts (API + web client)",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "install:all": "npm install && npm install --prefix server && npm install --prefix client",
+    "dev": "concurrently --names \"api,web\" --prefix-colors \"cyan,magenta\" --kill-others-on-fail \"npm run dev --prefix server\" \"npm run dev --prefix client\"",
+    "dev:server": "npm run dev --prefix server",
+    "dev:client": "npm run dev --prefix client",
+    "build": "npm run build --prefix client",
+    "start": "npm start --prefix server",
+    "test": "npm test --prefix server",
+    "db:reset": "npm run db:reset --prefix server"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

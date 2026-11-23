@@ -1,20 +1,27 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
+import {
+  LayoutDashboard, FolderKanban, Sparkles, FileCog,
+  Users, PieChart, KeyRound, History, Settings,
+} from 'lucide-react';
 import { logout, selectUser } from '../features/auth/authSlice.js';
 import { usePermissionChecker } from '../hooks/usePermission.js';
 import { Toasts } from './Toasts.jsx';
 import { TopBar } from './TopBar.jsx';
+import { PageHeadingActionsProvider } from './PageHeading.jsx';
+import { ChangePasswordGate } from './ChangePasswordGate.jsx';
+import { TooltipProvider } from './ui/tooltip.jsx';
 
 const NAV = [
-  { to: '/',           label: 'Dashboard',       icon: '▦' },
-  { to: '/projects',   label: 'Projects',        icon: '◫', require: ['projects', 'read'] },
-  { to: '/my-work',    label: 'My Work',         icon: '✦', require: ['stages', 'update_status'] },
-  { to: '/sop',        label: 'SOP Builder',     icon: '⛭', require: ['sop', 'update'] },
-  { to: '/users',      label: 'User Management', icon: '☰', require: ['users', 'read'] },
-  { to: '/reports',    label: 'Reports',         icon: '◑', require: ['reports', 'read'] },
-  { to: '/roles',      label: 'Roles',           icon: '⚿', require: ['roles', 'read'] },
-  { to: '/audit',      label: 'Audit Log',       icon: '⏱', require: ['audit', 'read'] },
-  { to: '/settings',   label: 'Settings',        icon: '⚙' },
+  { to: '/',           label: 'Dashboard',       icon: LayoutDashboard },
+  { to: '/projects',   label: 'Projects',        icon: FolderKanban, require: ['projects', 'read'] },
+  { to: '/my-work',    label: 'My Work',         icon: Sparkles, require: ['stages', 'update_status'] },
+  { to: '/sop',        label: 'SOP',             icon: FileCog, require: ['sop', 'update'] },
+  { to: '/users',      label: 'User Management', icon: Users, require: ['users', 'read'] },
+  { to: '/reports',    label: 'Reports',         icon: PieChart, require: ['reports', 'read'] },
+  { to: '/roles',      label: 'Roles',           icon: KeyRound, require: ['roles', 'read'] },
+  { to: '/audit',      label: 'Audit Log',       icon: History, require: ['audit', 'read'] },
+  { to: '/settings',   label: 'Settings',        icon: Settings },
 ];
 
 export function Layout() {
@@ -31,6 +38,7 @@ export function Layout() {
   };
 
   return (
+    <TooltipProvider delayDuration={200}>
     <div className="shell">
       <aside className="sidebar">
         <div className="brand">
@@ -49,7 +57,7 @@ export function Layout() {
               end={item.to === '/'}
               className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
             >
-              <span className="nav-icon">{item.icon}</span>
+              <item.icon className="nav-icon" size={18} strokeWidth={2} aria-hidden="true" />
               {item.label}
             </NavLink>
           ))}
@@ -70,13 +78,21 @@ export function Layout() {
       </aside>
 
       <div className="main-column">
-        <TopBar />
-        <main className="content">
-          <Outlet />
-        </main>
+        <PageHeadingActionsProvider>
+          {(setActionsNode) => (
+            <>
+              <TopBar actionsRef={setActionsNode} />
+              <main className="content">
+                <Outlet />
+              </main>
+            </>
+          )}
+        </PageHeadingActionsProvider>
       </div>
 
       <Toasts />
+      <ChangePasswordGate />
     </div>
+    </TooltipProvider>
   );
 }

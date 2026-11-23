@@ -1,7 +1,7 @@
 import { authService } from './auth.service.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { env } from '../../config/env.js';
-import { refreshCookieOptions } from '../../services/token.service.js';
+import { refreshCookieOptions, issueRefreshToken, signAccessToken } from '../../services/token.service.js';
 import { recordAudit } from '../../services/audit.service.js';
 import { AUDIT_ACTION, AUDIT_ENTITY } from '../../config/constants.js';
 
@@ -50,5 +50,27 @@ export const authController = {
 
   me: asyncHandler((req, res) => {
     res.json({ user: authService.me(req.user) });
+  }),
+
+  // Clearing a temporary password revokes every refresh token, so the browser
+  // that just changed it needs a fresh one issued here.
+  changePassword: asyncHandler((req, res) => {
+    const { user } = authService.changePassword(req.user.id, req.body);
+
+    setRefreshCookie(res, issueRefreshToken(user.id, req.headers['user-agent']));
+    recordAudit(req, {
+      entityType: AUDIT_ENTITY.USER,
+      entityId: user.id,
+      action: AUDIT_ACTION.UPDATE,
+      summary: `${user.email} set a new password`,
+    });
+
+    res.json({
+      user,
+      accessToken: signAccessToken({
+        id: user.id, email: user.email, roleId: user.role.id, roleKey: user.role.key,
+      }),
+      expiresIn: env.ACCESS_TOKEN_TTL,
+    });
   }),
 };

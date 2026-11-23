@@ -1,80 +1,149 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { FolderKanban, Layers, AlertTriangle, Bug } from 'lucide-react';
 import { fetchReports } from '../features/reports/reportsSlice.js';
-import { Badge, ErrorNote, ProgressBar, Spinner, EmptyState } from '../components/ui/Bits.jsx';
+import { downloadCsv } from '../lib/csv.js';
+import { ErrorNote, Spinner, EmptyState, KpiCard } from '../components/ui/Bits.jsx';
+import { Badge } from '../components/ui/badge.jsx';
+import { Avatar, AvatarFallback } from '../components/ui/avatar.jsx';
+import {
+  Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
+} from '../components/ui/table.jsx';
 
-const TONE = {
+const DERIVED_TONE = {
   NOT_STARTED: 'neutral', IN_PROGRESS: 'accent', AT_RISK: 'red',
   ON_HOLD: 'amber', COMPLETED: 'green', CANCELLED: 'neutral',
 };
 
+function initialsOf(name) {
+  if (!name) return '•';
+  const parts = name.trim().split(/\s+/);
+  return (parts[0]?.[0] ?? '') + (parts.length > 1 ? parts[parts.length - 1][0] : '');
+}
+
+/** Up to three initials-avatars for the team, then a "+N" overflow count. */
+function TeamStack({ names }) {
+  if (!names?.length) return <span className="text-muted-foreground">Unassigned</span>;
+  const shown = names.slice(0, 3);
+  const extra = names.length - shown.length;
+  return (
+    <div className="flex items-center" title={names.join(', ')}>
+      <div className="flex -space-x-2">
+        {shown.map((name) => (
+          <Avatar key={name} size="sm" className="ring-2 ring-card">
+            <AvatarFallback className="bg-brand-soft text-[10px] text-brand">{initialsOf(name)}</AvatarFallback>
+          </Avatar>
+        ))}
+      </div>
+      {extra > 0 && <span className="ml-1.5 text-xs text-muted-foreground">+{extra}</span>}
+    </div>
+  );
+}
+
 export function ReportsPage() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const data = useSelector((s) => s.reports.data);
   const status = useSelector((s) => s.reports.status);
   const error = useSelector((s) => s.reports.error);
 
   useEffect(() => { dispatch(fetchReports()); }, [dispatch]);
 
+  const openBugsBySeverity = useMemo(() => {
+    if (!data) return {};
+    return data.bugs
+      .filter((b) => b.status !== 'CLOSED')
+      .reduce((acc, b) => ({ ...acc, [b.severity]: (acc[b.severity] || 0) + b.total }), {});
+  }, [data]);
+
   if (status === 'loading' && !data) return <Spinner label="Building reports…" />;
   if (error) return <ErrorNote error={error} />;
   if (!data) return null;
 
-  const openBugsBySeverity = data.bugs
-    .filter((b) => b.status !== 'CLOSED')
-    .reduce((acc, b) => ({ ...acc, [b.severity]: (acc[b.severity] || 0) + b.total }), {});
+  const exportProjects = () => {
+    downloadCsv(`project-report-${new Date().toISOString().slice(0, 10)}.csv`, data.projects, [
+      { label: 'Code', value: (p) => p.code },
+      { label: 'Project', value: (p) => p.name },
+      { label: 'Client', value: (p) => p.clientName },
+      { label: 'Lead', value: (p) => p.ownerName ?? '' },
+      { label: 'Team', value: (p) => (p.members ?? []).join('; ') },
+      { label: 'Status', value: (p) => p.status },
+      { label: 'Derived status', value: (p) => p.progress.derivedStatus },
+      { label: 'Progress %', value: (p) => p.progress.percentComplete },
+      { label: 'Target end date', value: (p) => p.targetEndDate ?? '' },
+    ]);
+  };
 
   return (
     <div className="stack">
-      <header className="page-head">
-        <div>
-          <h1>Reports</h1>
-          <p className="muted small">Aggregated across the projects you can see.</p>
-        </div>
-      </header>
+      <div className="kpi-row">
+        <KpiCard icon={FolderKanban} label="Projects" value={data.totals.projects} tone="accent" />
+        <KpiCard icon={Layers} label="Stages" value={data.totals.stages} tone="neutral" />
+        <KpiCard icon={AlertTriangle} label="Overdue" value={data.totals.overdue} tone="red" />
+        <KpiCard icon={Bug} label="Open bugs" value={data.totals.openBugs} tone="amber" />
+      </div>
 
-      <section className="grid grid-4">
-        {[['Projects', data.totals.projects, null],
-          ['Stages', data.totals.stages, null],
-          ['Overdue', data.totals.overdue, data.totals.overdue ? 'var(--red)' : null],
-          ['Open bugs', data.totals.openBugs, data.totals.openBugs ? 'var(--amber)' : null],
-        ].map(([label, value, colour]) => (
-          <div key={label} className="stat">
-            <div className="stat-value" style={colour ? { color: colour } : undefined}>{value}</div>
-            <div className="stat-label">{label}</div>
+      {/* The report itself: every ongoing project, its status, its lead and
+          its team, in one table — exportable as the thing people actually
+          came here for, rather than scattered across several small panels. */}
+      <section className="card">
+        <div className="card-head bare">
+          <div>
+            <h3>Project report</h3>
+            <p className="muted xsmall">Every project in your scope, who leads it, and who's on it.</p>
           </div>
-        ))}
-      </section>
-
-      <section className="card card-pad">
-        <h3>Projects by derived status</h3>
-        <div className="row gap-sm">
-          {Object.entries(data.projectsByStatus).map(([key, count]) => (
-            <Badge key={key} tone={TONE[key]}>{key.replace('_', ' ')}: {count}</Badge>
-          ))}
+          <button type="button" className="btn btn-sm" onClick={exportProjects}>
+            ⭳ Export CSV
+          </button>
         </div>
-      </section>
 
-      <section className="card card-pad">
-        <h3>Project progress</h3>
-        <table className="table">
-          <thead><tr><th>Code</th><th>Project</th><th>Client</th><th>Target</th><th>Progress</th></tr></thead>
-          <tbody>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Project</TableHead>
+              <TableHead>Client</TableHead>
+              <TableHead>Lead</TableHead>
+              <TableHead>Team</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Progress</TableHead>
+              <TableHead>Target</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {data.projects.map((p) => (
-              <tr key={p.id}>
-                <td><Link to={`/projects/${p.id}`}>{p.code}</Link></td>
-                <td>{p.name}</td>
-                <td className="muted">{p.clientName}</td>
-                <td className="muted">{p.targetEndDate ?? '—'}</td>
-                <td style={{ minWidth: 160 }}>
-                  <ProgressBar value={p.progress.percentComplete} />
-                  <span className="muted xsmall">{p.progress.percentComplete}% · {p.progress.derivedStatus.replace('_', ' ').toLowerCase()}</span>
-                </td>
-              </tr>
+              <TableRow
+                key={p.id}
+                className="cursor-pointer"
+                onClick={() => navigate(`/projects/${p.id}`)}
+              >
+                <TableCell>
+                  <div className="font-medium text-foreground">{p.name}</div>
+                  <div className="text-xs text-muted-foreground">{p.code}</div>
+                </TableCell>
+                <TableCell className="text-muted-foreground">{p.clientName}</TableCell>
+                <TableCell>{p.ownerName ?? <span className="text-muted-foreground">Unassigned</span>}</TableCell>
+                <TableCell><TeamStack names={p.members} /></TableCell>
+                <TableCell>
+                  <Badge variant={DERIVED_TONE[p.progress.derivedStatus]}>
+                    {p.progress.derivedStatus.replace('_', ' ')}
+                  </Badge>
+                </TableCell>
+                <TableCell style={{ minWidth: 150 }}>
+                  <div className="progress" title={`${p.progress.percentComplete}% complete`}>
+                    <div className="progress-track">
+                      <div className="progress-fill" style={{ width: `${p.progress.percentComplete}%` }} />
+                    </div>
+                    <span className="progress-label">{p.progress.percentComplete}%</span>
+                  </div>
+                </TableCell>
+                <TableCell className="whitespace-nowrap text-muted-foreground">
+                  {p.targetEndDate ?? '—'}
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </section>
 
       <div className="grid grid-2">
@@ -110,7 +179,7 @@ export function ReportsPage() {
                     <tr key={w.id}>
                       <td>{w.full_name}</td><td className="muted">{w.team ?? '—'}</td>
                       <td>{w.open_stages}</td>
-                      <td>{w.blocked > 0 ? <Badge tone="red">{w.blocked}</Badge> : '0'}</td>
+                      <td>{w.blocked > 0 ? <Badge variant="red">{w.blocked}</Badge> : '0'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -127,7 +196,7 @@ export function ReportsPage() {
             : (
               <div className="row gap-sm">
                 {Object.entries(openBugsBySeverity).map(([sev, count]) => (
-                  <Badge key={sev} tone={sev === 'CRITICAL' ? 'red' : sev === 'HIGH' ? 'amber' : 'neutral'}>
+                  <Badge key={sev} variant={sev === 'CRITICAL' ? 'red' : sev === 'HIGH' ? 'amber' : 'neutral'}>
                     {sev}: {count}
                   </Badge>
                 ))}

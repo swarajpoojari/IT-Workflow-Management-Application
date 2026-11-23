@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -6,8 +6,9 @@ import {
   selectPreview, selectCreateStatus, selectProjectsError,
 } from '../features/projects/projectsSlice.js';
 import { fetchTemplates, selectTemplates } from '../features/sop/sopSlice.js';
-import { fetchUsers, selectUsers } from '../features/users/usersSlice.js';
+import { fetchUsers, fetchTeams, selectUsers, selectTeams } from '../features/users/usersSlice.js';
 import { Badge, ErrorNote, Field, Spinner } from '../components/ui/Bits.jsx';
+import { TeamCard } from '../components/ui/TeamCard.jsx';
 
 export function CreateProjectPage() {
   const dispatch = useDispatch();
@@ -15,6 +16,7 @@ export function CreateProjectPage() {
 
   const templates = useSelector(selectTemplates);
   const users = useSelector(selectUsers);
+  const teams = useSelector(selectTeams);
   const preview = useSelector(selectPreview);
   const createStatus = useSelector(selectCreateStatus);
   const error = useSelector(selectProjectsError);
@@ -27,6 +29,7 @@ export function CreateProjectPage() {
   useEffect(() => {
     dispatch(fetchTemplates());
     dispatch(fetchUsers({ isActive: true, limit: 100 }));
+    dispatch(fetchTeams());
     return () => { dispatch(clearPreview()); dispatch(clearProjectsError()); };
   }, [dispatch]);
 
@@ -52,20 +55,31 @@ export function CreateProjectPage() {
   };
 
   const itMembers = users.filter((u) => !u.isClientScope && u.isActive);
+
+  /**
+   * Which teams this SOP hands work to, and how much. Derived from the preview
+   * stages, so it reflects the exact published version that will be generated.
+   */
+  const involvedTeams = useMemo(() => {
+    const stages = preview.data?.stages ?? [];
+    const counts = new Map();
+
+    for (const stage of stages) {
+      if (!stage.defaultOwnerTeamId) continue;
+      counts.set(stage.defaultOwnerTeamId, (counts.get(stage.defaultOwnerTeamId) ?? 0) + 1);
+    }
+
+    return [...counts.entries()]
+      .map(([teamId, stageCount]) => ({ team: teams.find((t) => t.id === teamId), stageCount }))
+      .filter((row) => row.team)
+      .sort((a, b) => b.stageCount - a.stageCount);
+  }, [preview.data, teams]);
+
+  const unownedStages = (preview.data?.stages ?? []).filter((s) => !s.defaultOwnerTeamId).length;
   const ready = form.code && form.name && form.clientName && form.sopTemplateId && preview.status === 'succeeded';
 
   return (
     <>
-      <div className="page-head">
-        <div>
-          <h1>Create project</h1>
-          <p>
-            The workflow board is generated automatically from the latest <strong>published</strong> version
-            of the chosen SOP. Drafts are never used, and the version is pinned to the project for life.
-          </p>
-        </div>
-      </div>
-
       <ErrorNote error={error} onDismiss={() => dispatch(clearProjectsError())} />
 
       <div className="grid grid-2" style={{ alignItems: 'start' }}>
@@ -163,12 +177,47 @@ export function CreateProjectPage() {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <strong>{stage.name}</strong>
                       {stage.description && <div className="muted" style={{ fontSize: 12.5 }}>{stage.description}</div>}
+                      {stage.defaultOwnerTeamName && (
+                        <div className="muted xsmall">◌ {stage.defaultOwnerTeamName}</div>
+                      )}
                     </div>
                     <Badge tone={stage.clientVisible ? 'green' : 'neutral'}>
                       {stage.clientVisible ? 'Client-visible' : 'Internal'}
                     </Badge>
                   </div>
                 ))}
+
+                {involvedTeams.length > 0 && (
+                  <div className="involved-teams">
+                    <div className="card-head bare">
+                      <div>
+                        <h3>Teams this SOP commits</h3>
+                        <p className="muted xsmall">
+                          Each stage arrives already routed to its team. Only that team&apos;s active
+                          members can be made its owner.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="team-lg-grid">
+                      {involvedTeams.map(({ team, stageCount }) => (
+                        <TeamCard
+                          key={team.id}
+                          team={team}
+                          stageCount={stageCount}
+                          stageLabel="stages on this project"
+                        />
+                      ))}
+                    </div>
+
+                    {unownedStages > 0 && (
+                      <p className="muted xsmall" style={{ marginTop: 10 }}>
+                        {unownedStages} stage{unownedStages === 1 ? '' : 's'} name no team — anyone
+                        active can be assigned to {unownedStages === 1 ? 'it' : 'them'}.
+                      </p>
+                    )}
+                  </div>
+                )}
               </>
             ) : (
               preview.status !== 'loading' && (

@@ -5,7 +5,8 @@ export const PERMISSION_CATALOG = [
   [M.USERS,     A.READ,          'View users'],
   [M.USERS,     A.CREATE,        'Create users'],
   [M.USERS,     A.UPDATE,        'Edit user details and roles'],
-  [M.USERS,     A.DEACTIVATE,    'Deactivate / reactivate users'],
+  [M.USERS,     A.DEACTIVATE,    'Deactivate / activate users'],
+  [M.USERS,     A.DELETE,        'Permanently delete a user or a team'],
   [M.USERS,     A.REASSIGN,      'Bulk-reassign a user\'s stage assignments'],
 
   [M.ROLES,     A.READ,          'View roles and their permissions'],
@@ -57,7 +58,7 @@ export const ROLE_MATRIX = {
     isClientScope: false,
     permissions: [
       [M.USERS, A.READ], [M.USERS, A.CREATE], [M.USERS, A.UPDATE],
-      [M.USERS, A.DEACTIVATE], [M.USERS, A.REASSIGN],
+      [M.USERS, A.DEACTIVATE], [M.USERS, A.DELETE], [M.USERS, A.REASSIGN],
       [M.ROLES, A.READ],
       [M.SOP, A.READ],
       [M.PROJECTS, A.READ], [M.PROJECTS, A.READ_ALL], [M.PROJECTS, A.CREATE],

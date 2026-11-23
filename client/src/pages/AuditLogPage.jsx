@@ -1,34 +1,118 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   fetchAuditLog, fetchAuditFilters, setAuditFilter,
   selectAuditItems, selectAuditPagination, selectAuditFilters,
   selectAuditFilterOptions, selectAuditStatus, selectAuditError,
 } from '../features/audit/auditSlice.js';
-import { Badge, ErrorNote, Spinner, EmptyState } from '../components/ui/Bits.jsx';
+import { api } from '../api/axiosClient.js';
+import { endpoints } from '../api/endpoints.js';
+import { downloadCsv } from '../lib/csv.js';
+import { ErrorNote, Spinner, EmptyState } from '../components/ui/Bits.jsx';
+import { Badge } from '../components/ui/badge.jsx';
+import { Avatar, AvatarFallback } from '../components/ui/avatar.jsx';
+import {
+  Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
+} from '../components/ui/table.jsx';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+} from '../components/ui/dialog.jsx';
+import { cn } from 'cn';
 
-const ACTION_TONE = {
-  CREATE: 'green', PUBLISH: 'violet', DELETE: 'red', DEACTIVATE: 'red',
-  STATUS_CHANGE: 'accent', REASSIGN: 'amber', LOGIN: 'neutral', LOGOUT: 'neutral',
+const ACTION_VARIANT = {
+  CREATE: 'green', ACTIVATE: 'green', SIGNOFF: 'green',
+  UPDATE: 'accent', STATUS_CHANGE: 'accent', ASSIGN: 'accent', VIEW: 'neutral',
+  REASSIGN: 'amber', REORDER: 'amber', UPLOAD: 'amber', BUG_RAISED: 'amber', BUG_STATUS: 'amber',
+  DELETE: 'red', DEACTIVATE: 'red',
+  PUBLISH: 'violet',
+  LOGIN: 'neutral', LOGOUT: 'neutral',
 };
 
-function Diff({ oldValue, newValue }) {
-  if (!oldValue && !newValue) return <span className="muted">—</span>;
+const ACTION_LABEL = {
+  CREATE: 'Created', UPDATE: 'Updated', DELETE: 'Deleted', PUBLISH: 'Published',
+  REORDER: 'Reordered', STATUS_CHANGE: 'Status changed', ASSIGN: 'Assigned',
+  DEACTIVATE: 'Deactivated', ACTIVATE: 'Activated', REASSIGN: 'Reassigned',
+  LOGIN: 'Signed in', LOGOUT: 'Signed out', UPLOAD: 'Uploaded', SIGNOFF: 'Signed off',
+  BUG_RAISED: 'Bug raised', BUG_STATUS: 'Bug updated', VIEW: 'Viewed',
+};
 
-  const keys = [...new Set([...Object.keys(oldValue ?? {}), ...Object.keys(newValue ?? {})])];
+const ENTITY_LABEL = {
+  USER: 'Users', ROLE: 'Roles', SOP_TEMPLATE: 'SOP', SOP_VERSION: 'SOP',
+  SOP_STAGE: 'SOP', PROJECT: 'Projects', PROJECT_STAGE: 'Workflow',
+  DOCUMENT: 'Documents', AUTH: 'Auth', BUG: 'Bugs', SIGNOFF: 'Sign-off',
+  SETTINGS: 'Settings', BRD_LOOKUP: 'Public tracking', TEAM: 'Teams',
+};
+
+function initialsOf(name) {
+  if (!name) return '•';
+  const parts = name.trim().split(/\s+/);
+  return (parts[0]?.[0] ?? '') + (parts.length > 1 ? parts[parts.length - 1][0] : '');
+}
+
+/** The full before/after, in a dialog rather than crammed, mono, into a cell. */
+function DetailDialog({ entry, onClose }) {
+  const keys = entry
+    ? [...new Set([...Object.keys(entry.oldValue ?? {}), ...Object.keys(entry.newValue ?? {})])]
+    : [];
 
   return (
-    <div className="diff">
-      {keys.slice(0, 4).map((key) => (
-        <div key={key}>
-          <span className="muted">{key}: </span>
-          {oldValue?.[key] !== undefined && <span className="diff-old">{JSON.stringify(oldValue[key])}</span>}
-          {oldValue?.[key] !== undefined && newValue?.[key] !== undefined && <span className="muted"> → </span>}
-          {newValue?.[key] !== undefined && <span className="diff-new">{JSON.stringify(newValue[key])}</span>}
-        </div>
-      ))}
-      {keys.length > 4 && <span className="muted">+{keys.length - 4} more</span>}
-    </div>
+    <Dialog open={Boolean(entry)} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-lg">
+        {entry && (
+          <>
+            <DialogHeader>
+              <DialogTitle>{entry.summary}</DialogTitle>
+              <DialogDescription>
+                {entry.actorName ?? 'System'} · {entry.createdAt}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant={ACTION_VARIANT[entry.action] ?? 'neutral'}>
+                {ACTION_LABEL[entry.action] ?? entry.action}
+              </Badge>
+              <Badge variant="outline">
+                {ENTITY_LABEL[entry.entityType] ?? entry.entityType}
+                {entry.entityId && ` #${entry.entityId}`}
+              </Badge>
+            </div>
+
+            {keys.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No field-level detail recorded for this entry.</p>
+            ) : (
+              <div className="flex flex-col gap-2.5 rounded-lg border bg-muted/40 p-3">
+                {keys.map((key) => {
+                  const before = entry.oldValue?.[key];
+                  const after = entry.newValue?.[key];
+                  return (
+                    <div key={key} className="text-sm">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        {key}
+                      </div>
+                      <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                        {before !== undefined && (
+                          <span className="rounded bg-danger-soft px-1.5 py-0.5 text-danger line-through">
+                            {JSON.stringify(before)}
+                          </span>
+                        )}
+                        {before !== undefined && after !== undefined && (
+                          <span className="text-muted-foreground">→</span>
+                        )}
+                        {after !== undefined && (
+                          <span className="rounded bg-success-soft px-1.5 py-0.5 text-success">
+                            {JSON.stringify(after)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -41,6 +125,9 @@ export function AuditLogPage() {
   const status = useSelector(selectAuditStatus);
   const error = useSelector(selectAuditError);
 
+  const [detail, setDetail] = useState(null);
+  const [exporting, setExporting] = useState(false);
+
   useEffect(() => { dispatch(fetchAuditFilters()); }, [dispatch]);
 
   useEffect(() => {
@@ -50,31 +137,69 @@ export function AuditLogPage() {
 
   const update = (patch) => dispatch(setAuditFilter(patch));
 
+  /**
+   * Exports every entry matching the current filters, not just the page on
+   * screen — paging through the API itself (the server caps a single
+   * request at 100 rows) up to a safety limit, so this can't run away on an
+   * unexpectedly huge log.
+   */
+  const exportCsv = async () => {
+    setExporting(true);
+    try {
+      const base = Object.fromEntries(Object.entries(filters).filter(([k, v]) => v !== '' && k !== 'page'));
+      const rows = [];
+      const MAX_PAGES = 50;
+      for (let page = 1; page <= MAX_PAGES; page += 1) {
+        const { data } = await api.get(endpoints.audit.root, { params: { ...base, page, limit: 100 } });
+        rows.push(...data.items);
+        if (!data.pagination?.hasNext) break;
+      }
+      downloadCsv(`audit-log-${new Date().toISOString().slice(0, 10)}.csv`, rows, [
+        { label: 'Timestamp', value: (r) => r.createdAt },
+        { label: 'Actor', value: (r) => r.actorName ?? 'System' },
+        { label: 'Role', value: (r) => r.actorRole ?? '' },
+        { label: 'Action', value: (r) => ACTION_LABEL[r.action] ?? r.action },
+        { label: 'Module', value: (r) => ENTITY_LABEL[r.entityType] ?? r.entityType },
+        { label: 'Entity ID', value: (r) => r.entityId ?? '' },
+        { label: 'Summary', value: (r) => r.summary ?? '' },
+      ]);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <>
-      <div className="page-head">
-        <div>
-          <h1>Audit Log</h1>
-          <p>
-            Append-only record of every state change. Entries are written inside the same transaction
-            as the change they describe, and the table rejects <code>UPDATE</code> and <code>DELETE</code> at
-            the database level.
-          </p>
-        </div>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-muted-foreground">
+          {pagination ? `${pagination.total} entries match the filters below.` : 'Loading…'}
+        </p>
+        <button
+          type="button"
+          className="btn"
+          onClick={exportCsv}
+          disabled={exporting || !items.length}
+        >
+          {exporting ? 'Preparing export…' : '⭳ Export log'}
+        </button>
       </div>
 
       <ErrorNote error={error} />
 
-      <div className="card card-pad" style={{ marginBottom: 16 }}>
+      <div className="card card-pad mb-4">
         <div className="row">
           <select value={filters.entityType} onChange={(e) => update({ entityType: e.target.value })} style={{ width: 190 }}>
-            <option value="">All entity types</option>
-            {options.entityTypes.map((type) => <option key={type} value={type}>{type}</option>)}
+            <option value="">All modules</option>
+            {options.entityTypes.map((type) => (
+              <option key={type} value={type}>{ENTITY_LABEL[type] ?? type}</option>
+            ))}
           </select>
 
           <select value={filters.action} onChange={(e) => update({ action: e.target.value })} style={{ width: 180 }}>
             <option value="">All actions</option>
-            {options.actions.map((action) => <option key={action} value={action}>{action}</option>)}
+            {options.actions.map((action) => (
+              <option key={action} value={action}>{ACTION_LABEL[action] ?? action}</option>
+            ))}
           </select>
 
           <input type="date" value={filters.dateFrom} onChange={(e) => update({ dateFrom: e.target.value })} style={{ width: 165 }} title="From date" />
@@ -97,31 +222,64 @@ export function AuditLogPage() {
           <EmptyState title="No entries match these filters" hint="Try widening the date range or clearing the filters." />
         ) : (
           <>
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr><th>Timestamp</th><th>Actor</th><th>Action</th><th>Entity</th><th>Summary</th><th>Old → New</th></tr>
-                </thead>
-                <tbody>
-                  {items.map((entry) => (
-                    <tr key={entry.id}>
-                      <td className="mono muted" style={{ whiteSpace: 'nowrap' }}>{entry.createdAt}</td>
-                      <td>
-                        <strong style={{ fontSize: 13 }}>{entry.actorName ?? 'System'}</strong>
-                        <div className="muted" style={{ fontSize: 11.5 }}>{entry.actorRole}</div>
-                      </td>
-                      <td><Badge tone={ACTION_TONE[entry.action] ?? 'neutral'}>{entry.action}</Badge></td>
-                      <td>
-                        <span className="mono" style={{ fontSize: 11.5 }}>{entry.entityType}</span>
-                        {entry.entityId && <span className="muted"> #{entry.entityId}</span>}
-                      </td>
-                      <td style={{ fontSize: 13 }}>{entry.summary}</td>
-                      <td><Diff oldValue={entry.oldValue} newValue={entry.newValue} /></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Module</TableHead>
+                  <TableHead>Action</TableHead>
+                  <TableHead>Changed by</TableHead>
+                  <TableHead>Summary</TableHead>
+                  <TableHead>Date &amp; time</TableHead>
+                  <TableHead className="text-right">Details</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {items.map((entry) => (
+                  <TableRow key={entry.id}>
+                    <TableCell>
+                      <span className="font-medium">{ENTITY_LABEL[entry.entityType] ?? entry.entityType}</span>
+                      {entry.entityId && <span className="ml-1 text-muted-foreground">#{entry.entityId}</span>}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={ACTION_VARIANT[entry.action] ?? 'neutral'}>
+                        {ACTION_LABEL[entry.action] ?? entry.action}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Avatar size="sm">
+                          <AvatarFallback className="bg-brand-soft text-brand">
+                            {initialsOf(entry.actorName) || '◦'}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0">
+                          <div className="truncate font-medium">{entry.actorName ?? 'System'}</div>
+                          {entry.actorRole && (
+                            <div className="truncate text-xs text-muted-foreground">{entry.actorRole}</div>
+                          )}
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="max-w-xs truncate text-foreground">{entry.summary}</TableCell>
+                    <TableCell className="whitespace-nowrap text-muted-foreground">{entry.createdAt}</TableCell>
+                    <TableCell className="text-right">
+                      <button
+                        type="button"
+                        className={cn(
+                          'inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground',
+                          'hover:bg-accent hover:text-foreground',
+                        )}
+                        onClick={() => setDetail(entry)}
+                        aria-label={`View details for ${entry.summary}`}
+                        title="View details"
+                      >
+                        👁
+                      </button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
 
             {pagination && (
               <div className="pager">
@@ -147,6 +305,10 @@ export function AuditLogPage() {
           </>
         )}
       </div>
+
+      <DetailDialog entry={detail} onClose={() => setDetail(null)} />
     </>
   );
 }
+
+export default AuditLogPage;

@@ -14,7 +14,8 @@ export const fetchUsers = createAsyncThunk('users/fetchAll', async (params = {},
 export const fetchRoles = createAsyncThunk('users/fetchRoles', async (_, thunkApi) => {
   try {
     const { data } = await api.get(endpoints.roles.root);
-    return data.roles;
+    // `modules` is the full catalog, so a role card can show "7 of 10 modules".
+    return { roles: data.roles, modules: data.modules ?? [] };
   } catch (error) {
     return thunkApi.rejectWithValue(toRejection(error));
   }
@@ -23,7 +24,55 @@ export const fetchRoles = createAsyncThunk('users/fetchRoles', async (_, thunkAp
 export const createUser = createAsyncThunk('users/create', async (payload, thunkApi) => {
   try {
     const { data } = await api.post(endpoints.users.root, payload);
-    return data.user;
+    // The temporary password comes back exactly once — keep the envelope.
+    return data;
+  } catch (error) {
+    return thunkApi.rejectWithValue(toRejection(error));
+  }
+});
+
+export const fetchTeams = createAsyncThunk('users/fetchTeams', async (_, thunkApi) => {
+  try {
+    const { data } = await api.get(endpoints.teams.root);
+    return data.teams;
+  } catch (error) {
+    return thunkApi.rejectWithValue(toRejection(error));
+  }
+});
+
+export const createTeam = createAsyncThunk('users/createTeam', async (payload, thunkApi) => {
+  try {
+    const { data } = await api.post(endpoints.teams.root, payload);
+    return data.team;
+  } catch (error) {
+    return thunkApi.rejectWithValue(toRejection(error));
+  }
+});
+
+export const updateTeam = createAsyncThunk('users/updateTeam', async ({ id, patch }, thunkApi) => {
+  try {
+    const { data } = await api.patch(endpoints.teams.byId(id), patch);
+    return data.team;
+  } catch (error) {
+    return thunkApi.rejectWithValue(toRejection(error));
+  }
+});
+
+export const deleteTeam = createAsyncThunk('users/deleteTeam', async (id, thunkApi) => {
+  try {
+    await api.delete(endpoints.teams.byId(id));
+    return id;
+  } catch (error) {
+    return thunkApi.rejectWithValue(toRejection(error));
+  }
+});
+
+// Permanent. The API refuses with HAS_HISTORY when the account appears in
+// append-only records, and the confirm dialog surfaces that verbatim.
+export const deleteUser = createAsyncThunk('users/delete', async (user, thunkApi) => {
+  try {
+    await api.delete(endpoints.users.byId(user.id));
+    return user.id;
   } catch (error) {
     return thunkApi.rejectWithValue(toRejection(error));
   }
@@ -75,10 +124,17 @@ export const reassignAssignments = createAsyncThunk(
 const initialState = {
   items: [],
   roles: [],
+  modules: [],
+  teams: [],
+  teamsStatus: 'idle',
+  teamError: null,
   pagination: null,
   status: 'idle',
   error: null,
   mutationStatus: 'idle',
+  // Shown once, in the success panel, then dropped. Never re-fetchable.
+  lastInvite: null,
+  deleteError: null,
   reassign: {
     user: null,
     assignments: [],
@@ -97,6 +153,11 @@ const usersSlice = createSlice({
     },
     clearUsersError(state) {
       state.error = null;
+      state.deleteError = null;
+      state.teamError = null;
+    },
+    clearInvite(state) {
+      state.lastInvite = null;
     },
   },
   extraReducers: (builder) => {
@@ -112,12 +173,68 @@ const usersSlice = createSlice({
         state.error = action.payload;
       })
 
-      .addCase(fetchRoles.fulfilled, (state, action) => { state.roles = action.payload; })
+      .addCase(fetchRoles.fulfilled, (state, action) => {
+        state.roles = action.payload.roles;
+        state.modules = action.payload.modules;
+      })
+
+      .addCase(fetchTeams.pending, (state) => { state.teamsStatus = 'loading'; })
+      .addCase(fetchTeams.fulfilled, (state, action) => {
+        state.teamsStatus = 'succeeded';
+        state.teams = action.payload;
+      })
+      .addCase(fetchTeams.rejected, (state, action) => {
+        state.teamsStatus = 'failed';
+        state.teamError = action.payload;
+      })
+
+      .addCase(createTeam.fulfilled, (state, action) => {
+        state.teams.push({ ...action.payload, members: [] });
+        state.teams.sort((a, b) => a.name.localeCompare(b.name));
+        state.teamError = null;
+      })
+      .addCase(createTeam.rejected, (state, action) => { state.teamError = action.payload; })
+
+      .addCase(updateTeam.fulfilled, (state, action) => {
+        state.teams = state.teams.map((t) =>
+          (t.id === action.payload.id ? { ...t, ...action.payload } : t));
+        state.teamError = null;
+      })
+      .addCase(updateTeam.rejected, (state, action) => { state.teamError = action.payload; })
+
+      .addCase(deleteTeam.fulfilled, (state, action) => {
+        state.teams = state.teams.filter((t) => t.id !== action.payload);
+        // Members keep existing; the server just unassigns them.
+        state.items = state.items.map((u) =>
+          (u.teamId === action.payload ? { ...u, teamId: null, team: null, teamName: null } : u));
+      })
+      .addCase(deleteTeam.rejected, (state, action) => { state.teamError = action.payload; })
+
+      .addCase(deleteUser.pending, (state) => {
+        state.mutationStatus = 'loading';
+        state.deleteError = null;
+      })
+      .addCase(deleteUser.fulfilled, (state, action) => {
+        state.mutationStatus = 'succeeded';
+        state.items = state.items.filter((u) => u.id !== action.payload);
+        state.deleteError = null;
+      })
+      .addCase(deleteUser.rejected, (state, action) => {
+        state.mutationStatus = 'failed';
+        state.deleteError = action.payload;
+      })
 
       .addCase(createUser.pending, (state) => { state.mutationStatus = 'loading'; state.error = null; })
       .addCase(createUser.fulfilled, (state, action) => {
         state.mutationStatus = 'succeeded';
-        state.items.unshift(action.payload);
+        state.items.unshift(action.payload.user);
+        state.lastInvite = {
+          user: action.payload.user,
+          temporaryPassword: action.payload.temporaryPassword,
+          invite: action.payload.invite,
+        };
+        const team = state.teams.find((t) => t.id === action.payload.user.teamId);
+        if (team) team.memberCount += 1;
       })
       .addCase(createUser.rejected, (state, action) => {
         state.mutationStatus = 'failed';
@@ -172,13 +289,20 @@ const usersSlice = createSlice({
   },
 });
 
-export const { closeReassignModal, clearUsersError } = usersSlice.actions;
+export const { closeReassignModal, clearUsersError, clearInvite } = usersSlice.actions;
 export default usersSlice.reducer;
 
 export const selectUsers = (state) => state.users.items;
 export const selectUsersStatus = (state) => state.users.status;
+export const selectMutationStatus = (state) => state.users.mutationStatus;
 export const selectUsersError = (state) => state.users.error;
 export const selectRoles = (state) => state.users.roles;
+export const selectModules = (state) => state.users.modules;
+export const selectTeams = (state) => state.users.teams;
+export const selectTeamsStatus = (state) => state.users.teamsStatus;
+export const selectTeamError = (state) => state.users.teamError;
+export const selectLastInvite = (state) => state.users.lastInvite;
+export const selectDeleteError = (state) => state.users.deleteError;
 export const selectReassignState = (state) => state.users.reassign;
 
 export const selectReassignCandidates = createSelector(

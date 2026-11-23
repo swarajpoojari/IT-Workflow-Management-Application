@@ -78,6 +78,22 @@ router.get(
         ).all(...ids)
       : [];
 
+    // One row per project: everyone on it, newest-added last, so the report
+    // table can show the team without a second request per project.
+    const memberRows = ids.length
+      ? db.prepare(
+          `SELECT m.project_id, u.full_name
+             FROM project_members m
+             JOIN users u ON u.id = m.user_id
+            WHERE m.project_id IN ${inClause} AND u.is_active = 1
+            ORDER BY m.added_at`,
+        ).all(...ids)
+      : [];
+    const membersByProject = memberRows.reduce((acc, row) => {
+      (acc[row.project_id] ??= []).push(row.full_name);
+      return acc;
+    }, {});
+
     res.json({
       totals: {
         projects: projects.length,
@@ -93,7 +109,10 @@ router.get(
       cycleTime,
       projects: withProgress.map((p) => ({
         id: p.id, code: p.code, name: p.name, clientName: p.clientName,
-        brdNumber: p.brdNumber, targetEndDate: p.targetEndDate, progress: p.progress,
+        brdNumber: p.brdNumber, status: p.status, startDate: p.startDate,
+        targetEndDate: p.targetEndDate, ownerName: p.ownerName ?? null,
+        members: membersByProject[p.id] ?? [],
+        progress: p.progress,
       })),
     });
   }),

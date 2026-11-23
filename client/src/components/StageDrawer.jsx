@@ -144,6 +144,7 @@ export function StageDrawer({ projectId, stageId, onClose }) {
   const [tab, setTab] = useState('status');
   const [statusModal, setStatusModal] = useState(false);
   const [signoffNote, setSignoffNote] = useState('');
+  const [signoffDecision, setSignoffDecision] = useState(null);
   const [evidence, setEvidence] = useState({ fileName: '', fileUrl: '', docType: 'LINK', notes: '' });
 
   useEffect(() => {
@@ -184,8 +185,13 @@ export function StageDrawer({ projectId, stageId, onClose }) {
   };
 
   const submitSignoff = async (decision) => {
-    const result = await dispatch(recordSignoff({ projectId, stageId, payload: { decision, note: signoffNote } }));
-    if (!result.error) setSignoffNote('');
+    const result = await dispatch(recordSignoff({
+      projectId, stageId, payload: { decision, note: signoffNote.trim() || null },
+    }));
+    if (!result.error) {
+      setSignoffNote('');
+      setSignoffDecision(null);
+    }
   };
 
   const submitEvidence = async (event) => {
@@ -298,28 +304,97 @@ export function StageDrawer({ projectId, stageId, onClose }) {
 
         {tab === 'signoff' && (
           <div className="stack">
-            {detail.signoffs.length === 0 && <p className="muted small">No sign-off recorded.</p>}
-            {detail.signoffs.map((s) => (
-              <div key={s.id} className="list-row">
-                <div>
-                  <Badge tone={s.decision === 'APPROVED' ? 'green' : 'red'}>{s.decision}</Badge>
-                  <p className="muted xsmall">{s.signedByName} · {s.signedAt?.slice(0, 16).replace('T', ' ')}</p>
-                  {s.note && <p className="small">{s.note}</p>}
-                </div>
-              </div>
-            ))}
+            {detail.signoffs.length === 0 ? (
+              <p className="muted small">No sign-off recorded yet.</p>
+            ) : (
+              <ol className="signoff-trail">
+                {detail.signoffs.map((s, index) => (
+                  <li key={s.id} className={`signoff-entry is-${s.decision.toLowerCase()}`}>
+                    <span className="signoff-mark" aria-hidden="true">
+                      {s.decision === 'APPROVED' ? '✓' : '✕'}
+                    </span>
+                    <div className="signoff-body">
+                      <div className="signoff-head">
+                        <strong>{s.decision === 'APPROVED' ? 'Approved' : 'Changes requested'}</strong>
+                        {index === 0 && <span className="signoff-latest">latest</span>}
+                      </div>
+                      <p className="muted xsmall">
+                        {s.signedByName}
+                        {s.signedRole ? ` · ${s.signedRole.replace(/_/g, ' ').toLowerCase()}` : ''}
+                        {s.signedAt ? ` · ${s.signedAt.slice(0, 16).replace('T', ' ')}` : ''}
+                      </p>
+                      {s.note
+                        ? <p className="signoff-note">{s.note}</p>
+                        : <p className="muted xsmall">No note left.</p>}
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            )}
 
             {may('signoff') && stage.status !== 'COMPLETED' && (
-              <div className="stack bordered">
-                <Field label="Note">
-                  <textarea rows={2} value={signoffNote} onChange={(e) => setSignoffNote(e.target.value)} />
-                </Field>
-                <div className="row gap-sm">
-                  <button className="btn" type="button" disabled={signingOff}
-                    onClick={() => submitSignoff('APPROVED')}>Approve</button>
-                  <button className="btn btn-danger" type="button" disabled={signingOff}
-                    onClick={() => submitSignoff('REJECTED')}>Reject</button>
+              <div className="stack bordered signoff-form">
+                <span className="field-label">Record a decision</span>
+
+                <div className="decision-row">
+                  <button
+                    type="button"
+                    className={`decision ${signoffDecision === 'APPROVED' ? 'is-picked is-approve' : ''}`}
+                    onClick={() => setSignoffDecision('APPROVED')}
+                  >
+                    <span aria-hidden="true">✓</span> Approve
+                  </button>
+                  <button
+                    type="button"
+                    className={`decision ${signoffDecision === 'REJECTED' ? 'is-picked is-reject' : ''}`}
+                    onClick={() => setSignoffDecision('REJECTED')}
+                  >
+                    <span aria-hidden="true">✕</span> Request changes
+                  </button>
                 </div>
+
+                {signoffDecision && (
+                  <>
+                    <Field
+                      label={signoffDecision === 'REJECTED' ? 'What must change' : 'Approval note'}
+                      required={signoffDecision === 'REJECTED'}
+                      hint={signoffDecision === 'REJECTED'
+                        ? 'The owner sees this verbatim, so say what would make it pass.'
+                        : 'Optional — what you checked before approving.'}
+                    >
+                      <textarea
+                        rows={3} value={signoffNote} autoFocus
+                        onChange={(e) => setSignoffNote(e.target.value)}
+                        placeholder={signoffDecision === 'REJECTED'
+                          ? 'e.g. Two payment-path regressions are still open.'
+                          : 'e.g. Test evidence reviewed, release candidate signed.'}
+                      />
+                    </Field>
+
+                    <div className="row gap-sm">
+                      <button
+                        className={signoffDecision === 'REJECTED' ? 'btn btn-danger' : 'btn btn-success'}
+                        type="button"
+                        disabled={signingOff || (signoffDecision === 'REJECTED' && !signoffNote.trim())}
+                        onClick={() => submitSignoff(signoffDecision)}
+                      >
+                        {signingOff
+                          ? 'Recording…'
+                          : signoffDecision === 'REJECTED' ? 'Reject with note' : 'Approve stage'}
+                      </button>
+                      <button
+                        className="btn btn-secondary" type="button"
+                        onClick={() => { setSignoffDecision(null); setSignoffNote(''); }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+
+                    {signoffDecision === 'REJECTED' && !signoffNote.trim() && (
+                      <p className="muted xsmall">A rejection needs a note before it can be recorded.</p>
+                    )}
+                  </>
+                )}
               </div>
             )}
           </div>

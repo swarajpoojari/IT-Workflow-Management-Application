@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { authController } from './auth.controller.js';
-import { loginSchema } from './auth.schema.js';
+import { loginSchema, changePasswordSchema } from './auth.schema.js';
 import { validate } from '../../middleware/validate.js';
 import { authenticate, optionalAuthenticate } from '../../middleware/authenticate.js';
 import { env } from '../../config/env.js';
@@ -24,5 +24,12 @@ router.post('/refresh', authController.refresh);
 router.post('/logout', optionalAuthenticate, authController.logout);
 
 router.get('/me', authenticate, authController.me);
+
+router.post(
+  '/change-password',
+  authenticate,
+  validate({ body: changePasswordSchema }),
+  authController.changePassword,
+);
 
 export default router;

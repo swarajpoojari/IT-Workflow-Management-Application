@@ -239,7 +239,7 @@ export function WorkflowBoardPage() {
           </p>
         </div>
         <div style={{ minWidth: 220 }}>
-          <ProgressBar value={stats.percentComplete} label={`${stats.completed}/${stats.total} done`} />
+          <ProgressBar value={stats.percentComplete} label={`${stats.completed}/${stats.total} done`} segments={stats.total} />
           <div className="row" style={{ gap: 6, marginTop: 8, justifyContent: 'flex-end' }}>
             {stats.inProgress > 0 && <Badge tone="accent">{stats.inProgress} in progress</Badge>}
             {stats.blocked > 0 && <Badge tone="red">{stats.blocked} blocked</Badge>}

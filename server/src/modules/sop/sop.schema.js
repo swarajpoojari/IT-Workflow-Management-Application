@@ -26,6 +26,11 @@ export const createStageSchema = z.object({
   requiresSignoff: z.boolean().default(false),
   expectedDurationDays: z.coerce.number().int().min(0).max(3650).optional().nullable(),
   defaultOwnerTeam: z.string().trim().max(80).optional().nullable(),
+  // The team that will own this stage on every project generated from the SOP.
+  defaultOwnerTeamId: z
+    .preprocess((value) => (value === '' || value === null ? null : value),
+      z.coerce.number().int().positive().nullable())
+    .optional(),
 });
 
 export const updateStageSchema = createStageSchema.partial();

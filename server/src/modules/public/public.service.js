@@ -15,7 +15,46 @@ const publicStage = (stage) => ({
   dueDate: stage.dueDate,
   startedAt: stage.startedAt,
   completionDate: stage.completionDate,
+  assigneeName: stage.assigneeName ?? null,
+  owningTeamName: stage.owningTeamName ?? null,
 });
+
+function contactsFor(stages) {
+  const seen = new Map();
+  for (const stage of stages) {
+    if (!stage.assigneeName) continue;
+    if (!seen.has(stage.assigneeName)) {
+      seen.set(stage.assigneeName, { name: stage.assigneeName, role: stage.owningTeamName ?? stage.name });
+    }
+  }
+  return [...seen.values()];
+}
+
+function activityFor(stages) {
+  return stages
+    .filter((s) => s.completionDate || s.startedAt)
+    .flatMap((s) => {
+      const events = [];
+      if (s.startedAt) {
+        events.push({
+          at: s.startedAt,
+          label: `${s.name} moved to in progress`,
+          status: 'IN_PROGRESS',
+          actor: s.assigneeName ?? null,
+        });
+      }
+      if (s.completionDate) {
+        events.push({
+          at: s.completionDate,
+          label: `${s.name} completed`,
+          status: 'COMPLETED',
+          actor: s.assigneeName ?? null,
+        });
+      }
+      return events;
+    })
+    .sort((a, b) => new Date(b.at) - new Date(a.at));
+}
 
 export const publicService = {
   trackByBrd(brdNumber, { ip, userAgent }) {
@@ -47,6 +86,7 @@ export const publicService = {
       project: {
         brdNumber: project.brdNumber,
         name: project.name,
+        description: project.description ?? null,
         clientName: project.clientName,
         status: deriveProjectStatus(project, progress),
         startDate: project.startDate,
@@ -59,6 +99,8 @@ export const publicService = {
         percentComplete: progress.percentComplete,
       },
       stages: stages.map(publicStage),
+      contacts: contactsFor(stages),
+      activity: activityFor(stages),
     };
   },
 };

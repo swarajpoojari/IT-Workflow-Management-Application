@@ -9,6 +9,20 @@ const cast = (row) => {
 };
 
 export const roleModel = {
+  /** How many people hold each role, keyed by role id — for the role cards. */
+  memberCounts() {
+    const rows = getDb()
+      .prepare(
+        `SELECT role_id,
+                COUNT(*)                                  AS total,
+                SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) AS active
+           FROM users
+          GROUP BY role_id`,
+      )
+      .all();
+    return Object.fromEntries(rows.map((r) => [r.role_id, { total: r.total, active: r.active }]));
+  },
+
   findAll() {
     return getDb().prepare('SELECT * FROM roles ORDER BY id').all().map(cast);
   },
@@ -66,6 +80,14 @@ export const roleModel = {
 };
 
 export const permissionModel = {
+  /** Every module the permission catalog knows about, in display order. */
+  modules() {
+    return getDb()
+      .prepare('SELECT DISTINCT module FROM permissions ORDER BY module')
+      .all()
+      .map((row) => row.module);
+  },
+
   findAll() {
     return camelizeAll(getDb().prepare('SELECT * FROM permissions ORDER BY module, action').all());
   },

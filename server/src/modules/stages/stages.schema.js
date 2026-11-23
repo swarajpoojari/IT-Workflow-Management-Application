@@ -38,9 +38,17 @@ export const updateStatusSchema = z
   ])
   .describe(`One of: ${STAGE_STATUSES.join(', ')}`);
 
+// '' and null both mean "clear it", so they must survive coercion rather than
+// failing positive().
+const optionalId = z
+  .preprocess((value) => (value === '' || value === null ? null : value),
+    z.coerce.number().int().positive().nullable())
+  .optional();
+
 export const assignStageSchema = z.object({
-  assignedTo: z.coerce.number().int().positive().nullable().optional(),
+  assignedTo: optionalId,
   dueDate: isoDate.nullable().optional(),
+  owningTeamId: optionalId,
 });
 
 export const addDocumentSchema = z.object({

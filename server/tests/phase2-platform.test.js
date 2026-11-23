@@ -70,9 +70,11 @@ describe('Platform features', () => {
     const stages = await as(app, admin.token).get(`/api/projects/${project.id}/stages`);
     const stage = stages.body.stages.find((s) => s.status === 'NOT_STARTED');
 
+    // Released from its SOP team: this test is about the notification, not the
+    // team restriction, and dev belongs to a different team.
     await as(app, admin.token)
       .patch(`/api/projects/${project.id}/stages/${stage.id}/assign`)
-      .send({ assignedTo: dev.user.id });
+      .send({ assignedTo: dev.user.id, owningTeamId: null });
 
     const inbox = await as(app, dev.token).get('/api/notifications');
     expect(inbox.body.unreadCount).toBeGreaterThan(0);

@@ -5,16 +5,30 @@ import {
 } from '../features/settings/settingsSlice.js';
 import { usePermission } from '../hooks/usePermission.js';
 import { ErrorNote, Field, Spinner } from '../components/ui/Bits.jsx';
+import { Separator } from '../components/ui/separator.jsx';
 
-// The system table is key/value, so give the known keys a readable label
-// instead of showing a raw dotted key to the user.
-const SYSTEM_LABELS = {
-  'app.name': 'Application name',
-  'app.defaultStageSlaDays': 'Default stage SLA (days)',
-};
+// Keys the Settings page doesn't surface: the application's own name and its
+// default SLA aren't something day-to-day settings should expose or let
+// casual admins edit from here. Anything else in the table still renders
+// normally, so adding a new system setting later needs no change here.
+const HIDDEN_SYSTEM_KEYS = new Set(['app.name', 'app.defaultStageSlaDays']);
+
+const SYSTEM_LABELS = {};
 const humanise = (key) =>
   SYSTEM_LABELS[key]
   ?? key.split('.').pop().replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase());
+
+const THEME_OPTIONS = [
+  ['light', '☀', 'Light'],
+  ['dark', '☾', 'Dark'],
+  ['system', '◐', 'System'],
+];
+
+const NOTIFICATION_OPTIONS = [
+  ['notifyAssignments', 'Stage assignments', 'When a stage is assigned to you.'],
+  ['notifyBugs', 'Bug activity', 'When a bug you raised or own changes state.'],
+  ['notifySignoffs', 'Sign-off decisions', 'When a stage you own is approved or sent back.'],
+];
 
 export function SettingsPage() {
   const dispatch = useDispatch();
@@ -34,61 +48,72 @@ export function SettingsPage() {
 
   if (status === 'loading' && !mine) return <Spinner label="Loading settings…" />;
 
+  const visibleSystemKeys = Object.keys(systemDraft).filter((key) => !HIDDEN_SYSTEM_KEYS.has(key));
+
   return (
     <div className="stack narrow">
-      <header className="page-head"><h1>Settings</h1></header>
       <ErrorNote error={error} />
 
-      <section className="card card-pad">
-        <h3>Appearance</h3>
-        <Field label="Theme" hint="System follows your operating system setting.">
-          <div className="row gap-sm">
-            {['light', 'dark', 'system'].map((option) => (
-              <button
-                key={option} type="button"
-                className={`btn ${mine.theme === option ? '' : 'btn-secondary'}`}
-                onClick={() => { dispatch(setTheme(option)); update({ theme: option }); }}
-              >
-                {option[0].toUpperCase() + option.slice(1)}
-              </button>
+      <section className="card">
+        <div className="card-head bare">
+          <div>
+            <h3>Preferences</h3>
+            <p className="muted xsmall">How the app looks and what it notifies you about.</p>
+          </div>
+        </div>
+
+        <div className="card-pad" style={{ paddingTop: 4 }}>
+          <Field label="Appearance" hint="System follows your operating system setting.">
+            <div className="row gap-sm">
+              {THEME_OPTIONS.map(([value, icon, label]) => (
+                <button
+                  key={value} type="button"
+                  className={`btn ${mine.theme === value ? '' : 'btn-secondary'}`}
+                  onClick={() => { dispatch(setTheme(value)); update({ theme: value }); }}
+                  aria-pressed={mine.theme === value}
+                >
+                  <span aria-hidden="true">{icon}</span> {label}
+                </button>
+              ))}
+            </div>
+          </Field>
+
+          <Separator className="my-4" />
+
+          <span className="field-label" style={{ display: 'block', marginBottom: 10 }}>Notifications</span>
+          <div className="flex flex-col gap-1">
+            {NOTIFICATION_OPTIONS.map(([key, label, hint]) => (
+              <label key={key} className="check-row" style={{ alignItems: 'flex-start' }}>
+                <input
+                  type="checkbox" checked={Boolean(mine[key])}
+                  onChange={(e) => update({ [key]: e.target.checked })}
+                  style={{ marginTop: 2 }}
+                />
+                <span>
+                  <strong style={{ display: 'block', fontSize: 13.5 }}>{label}</strong>
+                  <small className="muted">{hint}</small>
+                </span>
+              </label>
             ))}
           </div>
-        </Field>
-        <Field label="Density">
-          <select value={mine.density} onChange={(e) => update({ density: e.target.value })}>
-            <option value="comfortable">Comfortable</option>
-            <option value="compact">Compact</option>
-          </select>
-        </Field>
+        </div>
       </section>
 
-      <section className="card card-pad">
-        <h3>Notifications</h3>
-        {[['notifyAssignments', 'Stage assignments'], ['notifyBugs', 'Bug activity'], ['notifySignoffs', 'Sign-off decisions']]
-          .map(([key, label]) => (
-            <label key={key} className="check-row">
-              <input
-                type="checkbox" checked={Boolean(mine[key])}
-                onChange={(e) => update({ [key]: e.target.checked })}
-              />
-              <span>{label}</span>
-            </label>
-          ))}
-      </section>
-
-      {canReadSystem && (
+      {canReadSystem && visibleSystemKeys.length > 0 && (
         <section className="card card-pad">
           <h3>System</h3>
-          {Object.keys(systemDraft).length === 0 && <p className="muted small">No system settings recorded.</p>}
-          {Object.entries(systemDraft).map(([key, value]) => (
+          <p className="muted xsmall" style={{ marginBottom: 10 }}>
+            Shared configuration. Changes here apply to every user.
+          </p>
+          {visibleSystemKeys.map((key) => (
             <Field key={key} label={humanise(key)}>
               <input
-                value={value ?? ''} disabled={!canWriteSystem}
+                value={systemDraft[key] ?? ''} disabled={!canWriteSystem}
                 onChange={(e) => setSystemDraft({ ...systemDraft, [key]: e.target.value })}
               />
             </Field>
           ))}
-          {canWriteSystem && Object.keys(systemDraft).length > 0 && (
+          {canWriteSystem && (
             <button className="btn" type="button" onClick={() => dispatch(saveSystemSettings(systemDraft))}>
               Save system settings
             </button>

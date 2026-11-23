@@ -1,95 +1,207 @@
 import { useEffect, useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { Link } from 'react-router-dom';
+import { useDispatch } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import { api, toRejection } from '../api/axiosClient.js';
 import { endpoints } from '../api/endpoints.js';
-import { Badge, EmptyState, Spinner, StatusBadge, ErrorNote } from '../components/ui/Bits.jsx';
-import { selectUser } from '../features/auth/authSlice.js';
+import { updateStageStatus } from '../features/stages/stagesSlice.js';
+import { pushToast } from '../features/ui/uiSlice.js';
+import { ListTodo, AlertTriangle, Clock3, CalendarX } from 'lucide-react';
+import { EmptyState, Spinner, StatusBadge, ErrorNote, KpiCard } from '../components/ui/Bits.jsx';
+import { StatusModal } from '../components/StatusModal.jsx';
+
+const daysUntil = (isoDate) => {
+  if (!isoDate) return null;
+  const target = new Date(`${isoDate}T00:00:00`);
+  if (Number.isNaN(target.getTime())) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.round((target - today) / 86_400_000);
+};
+
+/**
+ * One signal, not two: a BLOCKED stage is urgent regardless of its date, and
+ * everything else reads its urgency from how close (or how overdue) its due
+ * date is. "none" means no date and nothing blocking it — nothing to flag.
+ */
+function severityOf(stage) {
+  if (stage.status === 'BLOCKED') return 'critical';
+  const days = daysUntil(stage.dueDate);
+  if (days === null) return 'none';
+  if (days < 0) return 'critical';
+  if (days <= 2) return 'high';
+  if (days <= 7) return 'medium';
+  return 'low';
+}
+
+const SEVERITY_CLASS = {
+  critical: 'mywork-card is-critical',
+  high: 'mywork-card is-high',
+  medium: 'mywork-card is-medium',
+  low: 'mywork-card is-low',
+  none: 'mywork-card',
+};
+
+function dueLabel(stage) {
+  const days = daysUntil(stage.dueDate);
+  if (days === null) return null;
+  if (days < 0) return `${Math.abs(days)}d overdue`;
+  if (days === 0) return 'Due today';
+  return `Due in ${days}d`;
+}
+
+function WorkCard({ stage, busy, onOpenProject, onUpdateStatus }) {
+  const severity = severityOf(stage);
+  const due = dueLabel(stage);
+
+  return (
+    <article
+      className={SEVERITY_CLASS[severity]}
+      role="link"
+      tabIndex={0}
+      aria-label={`Open ${stage.projectName}`}
+      onClick={() => onOpenProject(stage.projectId)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenProject(stage.projectId); }
+      }}
+    >
+      <div className="mywork-card-top">
+        <div className="min-w-0">
+          <p className="mywork-project">{stage.projectCode} · {stage.projectClientName}</p>
+          <h3 className="mywork-stage-name">{stage.name}</h3>
+        </div>
+        <StatusBadge status={stage.status} />
+      </div>
+
+      <p className="mywork-project-title">{stage.projectName}</p>
+
+      {stage.blocker && (
+        <div className="mywork-flag">⛔ Blocked: {stage.blocker}</div>
+      )}
+
+      <div className="mywork-meta">
+        {due && (
+          <span className={`mywork-due ${severity === 'critical' || severity === 'high' ? 'is-urgent' : ''}`}>
+            ◷ {due}
+          </span>
+        )}
+        {!due && <span className="muted xsmall">No due date</span>}
+        {stage.documentCount > 0 && <span className="muted xsmall">▤ {stage.documentCount} doc{stage.documentCount === 1 ? '' : 's'}</span>}
+        {stage.owningTeamName && <span className="muted xsmall">◌ {stage.owningTeamName}</span>}
+      </div>
+
+      <div className="mywork-card-foot" onClick={(e) => e.stopPropagation()}>
+        <button type="button" className="btn btn-secondary btn-sm" onClick={() => onOpenProject(stage.projectId)}>
+          Open board
+        </button>
+        <button type="button" className="btn btn-sm" disabled={busy} onClick={() => onUpdateStatus(stage)}>
+          {busy ? 'Opening…' : 'Update status'}
+        </button>
+      </div>
+    </article>
+  );
+}
 
 export function MyWorkPage() {
-  const user = useSelector(selectUser);
   const dispatch = useDispatch();
+  const navigate = useNavigate();
 
   const [stages, setStages] = useState([]);
   const [status, setStatus] = useState('idle');
   const [error, setError] = useState(null);
+  const [editing, setEditing] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [resolvingId, setResolvingId] = useState(null);
 
-  useEffect(() => {
-    let cancelled = false;
+  const load = () => {
     setStatus('loading');
-
     api.get(endpoints.me.assignments)
-      .then(({ data }) => {
-        if (cancelled) return;
-        setStages(data.stages);
-        setStatus('succeeded');
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setError(toRejection(err));
-        setStatus('failed');
-      });
+      .then(({ data }) => { setStages(data.stages); setStatus('succeeded'); })
+      .catch((err) => { setError(toRejection(err)); setStatus('failed'); });
+  };
 
-    return () => { cancelled = true; };
-  }, [dispatch]);
+  useEffect(load, []);
 
-  const overdue = (stage) => stage.dueDate && stage.dueDate < new Date().toISOString().slice(0, 10);
+  const openStatusEditor = async (stage) => {
+    setResolvingId(stage.id);
+    try {
+      const { data } = await api.get(endpoints.projects.stageDetail(stage.projectId, stage.id));
+      setEditing({ ...stage, canComplete: data.completionBlockers.canComplete });
+    } catch (err) {
+      dispatch(pushToast(toRejection(err).message ?? 'Could not open this stage', 'error'));
+    } finally {
+      setResolvingId(null);
+    }
+  };
+
+  const submitStatus = async (payload) => {
+    setSaving(true);
+    const result = await dispatch(updateStageStatus({
+      projectId: editing.projectId, stageId: editing.id, payload,
+    }));
+    setSaving(false);
+    if (result.error) return;
+
+    const { stage: updated } = result.payload;
+    setEditing(null);
+    // A stage that just became COMPLETED drops off this list server-side
+    // (the same filter /me/assignments itself applies) rather than sitting
+    // here showing a status this page no longer tracks.
+    setStages((prev) => (
+      updated.status === 'COMPLETED'
+        ? prev.filter((s) => s.id !== updated.id)
+        : prev.map((s) => (s.id === updated.id ? { ...s, ...updated } : s))
+    ));
+  };
+
+  const severityCounts = stages.reduce((acc, s) => {
+    const sev = severityOf(s);
+    acc[sev] = (acc[sev] ?? 0) + 1;
+    return acc;
+  }, {});
 
   return (
     <>
-      <div className="page-head">
-        <div>
-          <h1>My Work</h1>
-          <p>
-            Open stages assigned to {user?.fullName}, across every project. Status only ever changes
-            when you change it — nothing here moves on its own.
-          </p>
-        </div>
-      </div>
-
       <ErrorNote error={error} />
 
-      <div className="card">
-        {status === 'loading' ? (
-          <Spinner label="Loading your assignments…" />
-        ) : stages.length === 0 ? (
+      {status === 'loading' && !stages.length ? (
+        <Spinner label="Loading your assignments…" />
+      ) : stages.length === 0 ? (
+        <div className="card">
           <EmptyState title="Nothing assigned" hint="Stages assigned to you will appear here." />
-        ) : (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr><th>Stage</th><th>Status</th><th>Due</th><th>Docs</th><th /></tr>
-              </thead>
-              <tbody>
-                {stages.map((stage) => (
-                  <tr key={stage.id}>
-                    <td>
-                      <strong>{stage.name}</strong>
-                      {stage.blocker && (
-                        <div className="muted" style={{ fontSize: 12 }}>Blocked: {stage.blocker}</div>
-                      )}
-                    </td>
-                    <td><StatusBadge status={stage.status} /></td>
-                    <td>
-                      {stage.dueDate ? (
-                        <span className={overdue(stage) ? '' : 'muted'}>
-                          {stage.dueDate} {overdue(stage) && <Badge tone="red">overdue</Badge>}
-                        </span>
-                      ) : (
-                        <span className="muted">—</span>
-                      )}
-                    </td>
-                    <td className="muted">{stage.documentCount || '—'}</td>
-                    <td style={{ textAlign: 'right' }}>
-                      <Link to={`/projects/${stage.projectId}`} className="btn btn-ghost btn-sm">Open board</Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        </div>
+      ) : (
+        <>
+          <div className="kpi-row">
+            <KpiCard icon={ListTodo} label="Assigned to you" value={stages.length} tone="accent" />
+            <KpiCard icon={AlertTriangle} label="Overdue / blocked" value={severityCounts.critical ?? 0} tone="red" />
+            <KpiCard icon={Clock3} label="Due within 2 days" value={severityCounts.high ?? 0} tone="amber" />
+            <KpiCard icon={CalendarX} label="No due date" value={severityCounts.none ?? 0} tone="neutral" />
           </div>
-        )}
-      </div>
+
+          <div className="mywork-grid">
+            {stages.map((stage) => (
+              <WorkCard
+                key={stage.id}
+                stage={stage}
+                busy={resolvingId === stage.id}
+                onOpenProject={(id) => navigate(`/projects/${id}`)}
+                onUpdateStatus={openStatusEditor}
+              />
+            ))}
+          </div>
+        </>
+      )}
+
+      {editing && (
+        <StatusModal
+          stage={editing}
+          busy={saving}
+          onSubmit={submitStatus}
+          onClose={() => setEditing(null)}
+        />
+      )}
     </>
   );
 }
+
+export default MyWorkPage;

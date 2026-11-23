@@ -9,6 +9,7 @@ import { env } from '../config/env.js';
 import { hashPasswordSync } from '../utils/password.js';
 import { roleModel, permissionModel } from '../models/role.model.js';
 import { userModel } from '../models/user.model.js';
+import { teamModel } from '../models/team.model.js';
 import { sopTemplateModel, sopVersionModel, sopStageModel } from '../models/sop.model.js';
 import { projectModel } from '../models/project.model.js';
 import { stageModel, statusHistoryModel, documentModel } from '../models/stage.model.js';
@@ -59,7 +60,44 @@ function seedRbac() {
   return roles;
 }
 
-function seedUsers(roles) {
+// [name, description, department, lead email]. The lead is linked after users
+// exist, which is why seedTeams runs in two passes.
+const TEAM_DEFINITIONS = [
+  ['IT Governance',     'Owns SOP templates, roles and platform policy.',            'Governance',          'superadmin@itwf.dev'],
+  ['PMO',               'Runs intake, project creation and delivery reporting.',     'Business Operations', 'admin@itwf.dev'],
+  ['Architecture',      'Solution design, integration contracts and estimation.',    'Technology',          'itmember@itwf.dev'],
+  ['Infrastructure',    'Environments, networking and platform provisioning.',       'Infrastructure',      'itmember@itwf.dev'],
+  ['Applications',      'Builds, ships and hands over the application work.',        'Technology',          'itmember2@itwf.dev'],
+  ['Quality Assurance', 'Test cycles, defect triage and release gates.',             'Technology',          'qa@itwf.dev'],
+];
+
+function seedTeams() {
+  const teams = {};
+  for (const [name, description, category] of TEAM_DEFINITIONS) {
+    teams[name] = teamModel.findByName(name) ?? teamModel.create({ name, description, category });
+  }
+  log(`  ✓ ${TEAM_DEFINITIONS.length} teams`);
+  return teams;
+}
+
+/** Second pass: teams need users, and users need teams. */
+function linkTeamLeads(teams, users) {
+  for (const [name, , , leadEmail] of TEAM_DEFINITIONS) {
+    const team = teams[name];
+    const lead = users[leadEmail];
+    if (team && lead && !team.leadUserId) {
+      teams[name] = teamModel.update(team.id, { leadUserId: lead.id });
+    }
+  }
+}
+
+/** SOP stages name their owning team as text; resolve it to a real row. */
+function withOwningTeam(stage, teams) {
+  const team = stage.defaultOwnerTeam ? teams[stage.defaultOwnerTeam] : null;
+  return { ...stage, defaultOwnerTeamId: team?.id ?? null };
+}
+
+function seedUsers(roles, teams) {
   const passwordHash = hashPasswordSync(env.SEED_PASSWORD);
 
   const definitions = [
@@ -82,9 +120,15 @@ function seedUsers(roles) {
           passwordHash,
           fullName: def.fullName,
           roleId: roles[def.roleKey].id,
+          teamId: def.team ? teams[def.team].id : null,
           team: def.team ?? null,
           clientName: def.clientName ?? null,
         });
+
+    // Older databases predate the teams table; link them on reseed.
+    if (existing && def.team && !existing.teamId) {
+      users[def.email] = userModel.update(existing.id, { teamId: teams[def.team].id });
+    }
   }
 
   log(`  ✓ ${definitions.length} users (password: ${env.SEED_PASSWORD})`);
@@ -209,7 +253,7 @@ function grantsFor(stageName, roles) {
   return grants;
 }
 
-function seedSop(users, roles) {
+function seedSop(users, roles, teams) {
   const superAdmin = users['superadmin@itwf.dev'];
   const templateName = 'Standard IT Onboarding SOP';
 
@@ -236,7 +280,9 @@ function seedSop(users, roles) {
     });
 
     SOP_STAGES.forEach((stage, index) => {
-      const created = sopStageModel.create({ ...stage, sopVersionId: draft.id, sequence: index + 1 });
+      const created = sopStageModel.create({
+        ...withOwningTeam(stage, teams), sopVersionId: draft.id, sequence: index + 1,
+      });
       const grants = grantsFor(stage.name, roles);
       if (grants.length) stagePermissionModel.setForSopStage(created.id, grants);
     });
@@ -406,7 +452,7 @@ function seedProjects(users, { template, publishedVersion }) {
   log(`  ✓ ${created.length} projects seeded with auto-generated boards`);
 }
 
-function seedDelivery(users, roles) {
+function seedDelivery(users, roles, teams) {
   const superAdmin = users['superadmin@itwf.dev'];
   const admin = users['admin@itwf.dev'];
   const qa = users['qa@itwf.dev'];
@@ -431,7 +477,9 @@ function seedDelivery(users, roles) {
       changeNote: 'Initial delivery baseline.',
     });
     DELIVERY_SOP_STAGES.forEach((stage, index) => {
-      const created = sopStageModel.create({ ...stage, sopVersionId: draft.id, sequence: index + 1 });
+      const created = sopStageModel.create({
+        ...withOwningTeam(stage, teams), sopVersionId: draft.id, sequence: index + 1,
+      });
       const grants = grantsFor(stage.name, roles);
       if (grants.length) stagePermissionModel.setForSopStage(created.id, grants);
     });
@@ -556,10 +604,12 @@ export function seed() {
 
   log('\n🌱 Seeding IT Workflow database…');
   const roles = seedRbac();
-  const users = seedUsers(roles);
-  const sop = seedSop(users, roles);
+  const teams = seedTeams();
+  const users = seedUsers(roles, teams);
+  linkTeamLeads(teams, users);
+  const sop = seedSop(users, roles, teams);
   seedProjects(users, sop);
-  seedDelivery(users, roles);
+  seedDelivery(users, roles, teams);
   systemSettingsModel.set('app.name', 'IT Workflow Management', users['superadmin@itwf.dev'].id);
   systemSettingsModel.set('app.defaultStageSlaDays', '5', users['superadmin@itwf.dev'].id);
 
