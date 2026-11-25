@@ -10,6 +10,7 @@ import {
 } from '../components/ui/card.jsx';
 import { Separator } from '../components/ui/separator.jsx';
 import { selectIsAuthenticated, selectRoleKey } from '../features/auth/authSlice.js';
+import { formatDate } from '../lib/date.js';
 
 // Internal staff viewing this page (e.g. via the "Track" shortcut in the app
 // topbar) get the history/contacts panel; anonymous clients following a BRD
@@ -175,11 +176,11 @@ export function PublicTrackPage() {
                     </div>
                     <div>
                       <dt>Kickoff date</dt>
-                      <dd>{data.project.startDate ?? '—'}</dd>
+                      <dd>{formatDate(data.project.startDate) ?? '—'}</dd>
                     </div>
                     <div>
                       <dt>Target completion</dt>
-                      <dd>{data.project.targetEndDate ?? '—'}</dd>
+                      <dd>{formatDate(data.project.targetEndDate) ?? '—'}</dd>
                     </div>
                   </dl>
                 </CardContent>

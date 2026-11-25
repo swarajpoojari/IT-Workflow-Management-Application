@@ -54,7 +54,9 @@ export const projectModel = {
 
     const clause = where.length ? ` WHERE ${where.join(' AND ')}` : '';
     const rows = getDb()
-      .prepare(`${SELECT_PROJECT}${clause} ORDER BY p.created_at DESC LIMIT @limit OFFSET @offset`)
+      // Oldest first, so a newly created project lands at the bottom of the
+      // list with the highest row number — not buried at the top by recency.
+      .prepare(`${SELECT_PROJECT}${clause} ORDER BY p.id ASC LIMIT @limit OFFSET @offset`)
       .all(params);
 
     const countParams = { ...params };

@@ -286,31 +286,37 @@ a:hover { color: var(--accent-dark); }
 
 /* ── Buttons ───────────────────────────────────────────────────────────── */
 
+/* Soft at rest, like every other accent surface on the dashboard (KPI
+   tiles, panel icons) — solid accent only on hover/focus, so a primary
+   action reads as part of the same light theme rather than a lone bright
+   button next to otherwise-muted cards. */
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 7px;
   min-height: 2.5rem; padding: .55rem .95rem;
   border: 1px solid transparent; border-radius: var(--radius-sm);
   font-family: inherit; font-size: 13.5px; font-weight: 650; line-height: 1.2;
   white-space: nowrap; cursor: pointer;
-  background: var(--gradient-primary); color: #fff;
-  box-shadow: 0 2px 4px rgba(21, 84, 209, .16);
+  background: var(--accent-soft); color: var(--accent-dark);
+  box-shadow: 0 2px 7px rgba(16, 24, 40, .22);
   transition: background var(--transition-fast), border-color var(--transition-fast),
               color var(--transition-fast), box-shadow var(--transition-fast),
               transform var(--transition-fast);
 }
 .btn:hover:not(:disabled) {
-  background: var(--accent-dark);
-  box-shadow: 0 3px 9px rgba(23, 86, 209, .16);
+  background: var(--gradient-primary); color: #fff;
+  box-shadow: 0 5px 14px rgba(16, 24, 40, .32);
 }
 .btn:active:not(:disabled) { transform: translateY(1px); }
 .btn:disabled { opacity: .55; cursor: not-allowed; box-shadow: none; }
 
+/* Lighter shadow than the coloured variants — a white button on a white
+   card needs just enough lift to read as a button, not a dark halo. */
 .btn-secondary {
   background: var(--surface); color: var(--text);
-  border-color: var(--border); box-shadow: var(--shadow-xs);
+  border-color: var(--border); box-shadow: 0 1px 4px rgba(16, 24, 40, .1);
 }
 .btn-secondary:hover:not(:disabled) {
-  background: var(--surface-hover); border-color: var(--border-strong);
+  background: var(--surface-hover); border-color: var(--border-strong); box-shadow: 0 3px 8px rgba(16, 24, 40, .14);
 }
 
 .btn-ghost { background: transparent; color: var(--text-2); border-color: transparent; box-shadow: none; }
@@ -319,9 +325,14 @@ a:hover { color: var(--accent-dark); }
 /* Soft at rest — a destructive action shouldn't be the loudest thing on the
    screen — and only goes to a solid, unmistakable red on hover/focus, right
    as you're about to click it. */
-.btn-danger { background: var(--red-soft); color: var(--red); border-color: transparent; box-shadow: none; }
+.btn-danger { background: var(--red-soft); color: var(--red); border-color: transparent; box-shadow: 0 2px 7px rgba(16, 24, 40, .22); }
 .btn-danger:hover:not(:disabled), .btn-danger:focus-visible:not(:disabled) {
-  background: var(--red); color: #fff;
+  background: var(--red); color: #fff; box-shadow: 0 5px 14px color-mix(in srgb, var(--red) 45%, rgba(16, 24, 40, .3));
+}
+
+.btn-success { background: var(--green-soft); color: var(--green); border-color: transparent; box-shadow: 0 2px 7px rgba(16, 24, 40, .22); }
+.btn-success:hover:not(:disabled), .btn-success:focus-visible:not(:disabled) {
+  background: var(--green); color: #fff; box-shadow: 0 5px 14px color-mix(in srgb, var(--green) 45%, rgba(16, 24, 40, .3));
 }
 
 .btn-indigo { background: var(--indigo); box-shadow: 0 2px 4px rgba(81, 70, 229, .18); }
@@ -381,7 +392,14 @@ textarea:not([data-slot]) { resize: vertical; min-height: 6rem; }
 
 /* ── Tables ────────────────────────────────────────────────────────────── */
 
-.table-wrap { overflow-x: auto; }
+/* Clips the table to the card's own corner radius, so a full-height row
+   accent (the hover bar on a clickable row, .row-link) doesn't poke a
+   square corner past the card's rounded edge on the first/last row. Only
+   the corners that actually sit at a rounded card edge are rounded here —
+   a table-wrap preceded by a card-head sits flush under a square-ish
+   header bottom, so only its own bottom corners round. */
+.table-wrap { overflow-x: auto; overflow-y: hidden; border-radius: var(--radius); }
+.card-head + .table-wrap, .card-head ~ .table-wrap { border-radius: 0 0 var(--radius) var(--radius); }
 table { width: 100%; border-collapse: collapse; font-size: 13.5px; text-align: left; }
 th {
   text-align: left; padding: .8rem 1rem; font-size: 11px; font-weight: 700;
@@ -396,6 +414,7 @@ td {
 thead + tbody tr:first-child td { border-top: 0; }
 tbody tr:hover { background: var(--surface-hover); }
 .muted { color: var(--text-3); }
+.row-inline-icon { display: inline-flex; align-items: center; gap: 4px; }
 .mono { font-family: var(--mono); font-size: 12px; }
 
 /* ── Badges ────────────────────────────────────────────────────────────── */
@@ -406,6 +425,14 @@ tbody tr:hover { background: var(--surface-hover); }
   border: 1px solid transparent; border-radius: 999px;
   font-size: 11px; font-weight: 700; line-height: 1.2; white-space: nowrap;
 }
+.badge-removable {
+  display: inline-flex; align-items: center; gap: 5px;
+  min-height: 1.35rem; padding: .18rem .5rem .18rem .6rem;
+  border: 1px solid transparent; border-radius: 999px;
+  font-size: 11px; font-weight: 700; line-height: 1.2; white-space: nowrap;
+  background: var(--accent-soft); color: var(--accent-dark); cursor: pointer;
+}
+.badge-removable:hover { background: var(--accent-soft); opacity: .85; }
 .status-not-started { background: var(--slate-soft);  color: var(--slate); }
 .status-in-progress { background: var(--accent-soft); color: var(--accent-dark); }
 .status-blocked     { background: var(--red-soft);    color: var(--red); }
@@ -506,7 +533,8 @@ tbody tr:hover { background: var(--surface-hover); }
   backdrop-filter: blur(2px);
 }
 .modal {
-  background: var(--surface); border-radius: 12px; box-shadow: var(--shadow-lg);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow-lg);
   width: 100%; max-width: 500px; max-height: 88vh; display: flex; flex-direction: column;
 }
 .modal-wide { max-width: 780px; }
@@ -519,7 +547,7 @@ tbody tr:hover { background: var(--surface-hover); }
 .modal-foot {
   padding: 14px 20px; border-top: 1px solid var(--border);
   display: flex; justify-content: flex-end; gap: 9px; background: var(--surface-2);
-  border-radius: 0 0 12px 12px;
+  border-radius: 0 0 calc(var(--radius) - 1px) calc(var(--radius) - 1px);
 }
 
 /* ── Notices ───────────────────────────────────────────────────────────── */
@@ -637,7 +665,7 @@ tbody tr:hover { background: var(--surface-hover); }
 
 .topbar {
   display: flex; align-items: center; justify-content: space-between; gap: 1rem;
-  padding: .6rem 1.5rem; border-bottom: 1px solid var(--border);
+  padding: .6rem 1.5rem;
   background: var(--surface); position: sticky; top: 0; z-index: 20;
 }
 
@@ -649,10 +677,26 @@ tbody tr:hover { background: var(--surface-hover); }
 }
 
 .profile-trigger {
-  background: none; border: 0; padding: 0; line-height: 0; cursor: pointer;
-  border-radius: 999px; transition: box-shadow var(--transition-fast);
+  display: inline-flex; align-items: center; gap: 8px;
+  background: none; border: 0; padding: 2px 6px 2px 2px; cursor: pointer;
+  border-radius: 999px; transition: background var(--transition-fast);
 }
-.profile-trigger:hover, .profile-trigger[data-state="open"] { box-shadow: 0 0 0 2px var(--accent-soft); }
+.profile-trigger:hover, .profile-trigger[data-state="open"] { background: var(--surface-hover); }
+.profile-name { font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; }
+.profile-chevron { color: var(--text-3); flex: none; }
+
+/* Solid colour, a touch bigger than the shadcn default, and a slightly
+   softened corner instead of a perfect circle — plus flex centring so the
+   initials sit dead centre regardless of font metrics. */
+.profile-avatar.profile-avatar {
+  width: 34px; height: 34px; border-radius: 11px;
+  display: flex; align-items: center; justify-content: center;
+}
+.profile-avatar .bg-brand {
+  display: flex; align-items: center; justify-content: center;
+  width: 100%; height: 100%; font-weight: 650; font-size: 13px; line-height: 1;
+}
+
 .profile-menu-label { display: flex; flex-direction: column; gap: .1rem; }
 .profile-menu-label small { font-weight: 400; }
 .tray {
@@ -757,6 +801,27 @@ tbody tr:hover { background: var(--surface-hover); }
 
 /* Shared helpers */
 .stack.narrow { max-width: 680px; }
+
+/* ── Settings accordion ───────────────────────────────────────────────────── */
+/* One card shell, centred on the page — each section is a flush row inside
+   it (divider, not its own bordered card), matching a single settings panel
+   rather than a stack of separate cards. */
+.settings-shell { max-width: 720px; margin: 0 auto; }
+.settings-card { padding: 0; overflow: hidden; }
+
+.settings-row { border-bottom: 1px solid var(--border); }
+.settings-row:last-child { border-bottom: 0; }
+.settings-row > summary { list-style: none; cursor: pointer; padding: 16px 22px; }
+.settings-row > summary::-webkit-details-marker { display: none; }
+.settings-row:hover > summary { background: var(--surface-hover); }
+.settings-row-body { padding: 2px 22px 22px; }
+
+.settings-summary {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+}
+.settings-chevron { color: var(--text-3); flex: none; margin-top: 2px; transition: transform var(--transition-fast); }
+.settings-row[open] .settings-chevron { transform: rotate(180deg); }
+.success-text { color: var(--green); font-size: 13px; font-weight: 600; }
 .stack.bordered, .bordered { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: .75rem; }
 .row.between { justify-content: space-between; }
 .row.gap-sm { gap: 6px; }

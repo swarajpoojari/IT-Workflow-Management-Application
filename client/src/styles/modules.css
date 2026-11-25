@@ -32,6 +32,7 @@
   border-radius: var(--radius-lg); padding: 15px 16px;
   display: flex; flex-direction: column; gap: 2px;
   position: relative; overflow: hidden;
+  height: 85px;
 }
 .kpi::before {
   content: ''; position: absolute; inset: 0 auto 0 0; width: 3px;
@@ -120,10 +121,16 @@
    empty column beside it. See design.md D2. ─────────────────────────────── */
 .dash-grid { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 .dash-row {
-  display: grid; grid-template-columns: minmax(0, 1fr) 384px; gap: 16px;
+  display: grid; grid-template-columns: minmax(0, 1fr) 435px; gap: 16px;
   align-items: stretch;
 }
 .dash-row > *:only-child { grid-column: 1 / -1; }
+
+/* The actual complaint was the dead air *inside* each card above its header
+   icon/title — not the gap between cards, which this undoes back to 16px.
+   ~60% less top padding than the standard .card-pad, scoped to the
+   dashboard only so every other page's cards keep their normal padding. */
+.dash-grid .card-pad { padding-top: 7px; }
 
 /* Three side-by-side cards (Project Summary, Active Projects, Needs
    Attention) rather than two stacked in a .dash-split under a rail card —
@@ -132,7 +139,7 @@
    top-level row item. The rail column here matches .dash-row's 384px so the
    two rows' right edges still line up. */
 .dash-row-3 {
-  display: grid; grid-template-columns: minmax(0, 320px) minmax(0, 1fr) 384px;
+  display: grid; grid-template-columns: minmax(0, 350px) minmax(0, 1fr) 435px;
   gap: 16px; align-items: stretch;
 }
 
@@ -149,14 +156,14 @@
 /* ~10% shorter than the base .kpi tile, scoped to the dashboard only. */
 .dash-kpi-row .kpi { padding-top: 13px; padding-bottom: 13px; }
 .dash-kpi-row .kpi-icon { width: 34px; height: 34px; }
-.dash-kpi-row .kpi-ring { width: 38px; height: 38px; }
+.dash-kpi-row .kpi-ring { width: 40px; height: 40px; }
 .dash-kpi-row .kpi-ring::after { width: 28px; height: 28px; }
 @media (max-width: 900px) {
   .dash-kpi-row { grid-template-columns: repeat(2, 1fr); }
 }
 
 /* ── Panel header icon tile ───────────────────────────────────────────────── */
-.card-head-title { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
+.card-head-title { display: flex; align-items: flex-start; gap: 10px; min-width: 0; align-items: center; }
 .card-head-title h3 { margin: 0; }
 .panel-icon {
   width: 30px; height: 30px; border-radius: 9px; flex: none;
@@ -165,6 +172,9 @@
 }
 .panel-icon.is-accent { background: var(--accent-soft); color: var(--accent); }
 .panel-icon.is-red    { background: var(--red-soft);    color: var(--red); }
+.panel-icon.is-amber  { background: var(--amber-soft);  color: var(--amber); }
+.panel-icon.is-green  { background: var(--green-soft);  color: var(--green); }
+.panel-icon.is-violet { background: var(--violet-soft); color: var(--violet); }
 .panel-link { display: inline-flex; align-items: center; gap: 2px; }
 
 /* ── Portfolio status donut centre label ──────────────────────────────────── */
@@ -178,7 +188,12 @@
 .donut-center {
   position: absolute; inset: 0; display: flex; flex-direction: column;
   align-items: center; justify-content: center; pointer-events: none;
+  z-index: 1;
 }
+/* Recharts' tooltip wrapper has no z-index of its own, so the donut's
+   centre label (painted after it in the DOM) would otherwise sit on top
+   and obscure the hover tooltip text. */
+.recharts-tooltip-wrapper { z-index: 20; pointer-events: none; }
 .donut-center strong { font-size: 18px; font-weight: 700; line-height: 1.1; }
 .donut-center span { font-size: 10px; color: var(--text-muted); }
 
@@ -216,9 +231,9 @@
 .promo-content p { font-size: 12px; line-height: 1.5; color: var(--text-secondary); margin: 0 0 12px; }
 
 .promo-cta {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 7px 13px; border: 0; border-radius: 999px;
-  background: var(--accent); color: #fff; font-size: 11px; font-weight: 600;
+  display: inline-flex; align-items: center; gap: 9px;
+  padding: 10.5px 19.5px; border: 0; border-radius: 999px;
+  background: var(--accent); color: #fff; font-size: 16.5px; font-weight: 600;
   text-decoration: none; transition: background .2s ease, box-shadow .2s ease, transform .2s ease;
 }
 .promo-cta:hover {
@@ -228,14 +243,15 @@
 }
 .promo-illustration {
   position: relative; z-index: 2; flex: none;
-  width: 68px; height: 68px; border-radius: 18px;
+  width: 272px; height: 272px; border-radius: 18px;
   display: grid; place-items: center; background: var(--surface);
   color: var(--accent); box-shadow: var(--shadow-xs);
+  right: -70px;
 }
 
 @media (max-width: 1100px) {
   .promo-card { min-height: 135px; padding: 14px; }
-  .promo-illustration { width: 56px; height: 56px; }
+  .promo-illustration { width: 160px; height: 160px; right: -40px; }
 }
 
 .card-head.bare { border-bottom: 0; padding-bottom: 6px; align-items: flex-start; }
@@ -275,7 +291,12 @@
 .quick-actions-card .quick-grid { flex: 1; align-content: center; }
 .quick-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 2px; }
 .quick-action {
-  display: flex; align-items: center; gap: 9px;
+  /* min-width: 0 overrides the grid item's implicit auto minimum, which a
+     nowrap label would otherwise set to its full (unwrapped) text width —
+     that's what was letting a longer label like "User Management" push its
+     1fr track wider than its sibling's, instead of both tiles staying equal
+     and truncating. */
+  display: flex; align-items: center; gap: 9px; min-width: 0;
   padding: 9px 10px; border-radius: var(--radius-sm); text-decoration: none;
   color: inherit; border: 1px solid var(--border); transition: background .15s, border-color .15s;
 }
@@ -451,6 +472,14 @@
   display: grid; place-items: center; font-size: 12px; font-weight: 650;
   background: var(--accent-soft); color: var(--accent-dark);
 }
+/* personTone() (Bits.jsx) assigns one of these per person, so a list of
+   different assignees reads as distinct people rather than one colour. */
+.user-avatar.tone-accent  { background: var(--accent-soft); color: var(--accent-dark); }
+.user-avatar.tone-green   { background: var(--green-soft);  color: var(--green); }
+.user-avatar.tone-violet  { background: var(--violet-soft); color: var(--violet); }
+.user-avatar.tone-amber   { background: var(--amber-soft);  color: var(--amber); }
+.user-avatar.tone-red     { background: var(--red-soft);    color: var(--red); }
+.user-avatar.tone-neutral { background: var(--slate-soft);  color: var(--slate); }
 .user-cell small { display: block; font-size: 11px; }
 .row-actions { display: flex; gap: 6px; justify-content: flex-end; }
 
@@ -591,30 +620,46 @@
 .seg-blocked  { background: var(--amber); }
 .seg-pending  { background: var(--border); }
 
+/* Dark pill, matching the shadcn Tooltip's own look (bg-foreground on
+   text-background) rather than a plain white card — so every tooltip in
+   the app reads as the same component. */
 .stage-seg-tip {
   position: absolute; bottom: calc(100% + 11px); left: 50%; transform: translateX(-50%);
-  background: var(--surface); border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm); box-shadow: var(--shadow);
-  padding: 9px 11px; display: flex; flex-direction: column; gap: 3px;
+  background: var(--text); border: 0;
+  border-radius: var(--radius-sm); box-shadow: var(--shadow-lg);
+  padding: 9px 12px; display: flex; flex-direction: column; gap: 3px;
   white-space: nowrap; z-index: 20; text-align: left; pointer-events: none;
 }
-.stage-seg-tip strong { font-size: 12.5px; }
+.stage-seg-tip::after {
+  content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+  width: 9px; height: 9px; background: var(--text); border-radius: 2px;
+  margin-top: -5px; rotate: 45deg;
+}
+.stage-seg-tip strong { font-size: 12.5px; color: var(--surface); }
 .tip-status { font-size: 11px; font-weight: 600; background: none; }
 .tip-status.seg-complete { color: var(--green); }
 .tip-status.seg-progress { color: var(--accent); }
 .tip-status.seg-hold     { color: var(--red); }
 .tip-status.seg-blocked  { color: var(--amber); }
-.tip-status.seg-pending  { color: var(--text-3); }
-.tip-owner, .tip-due { font-size: 11.5px; color: var(--text-2); }
-.tip-owner b { color: var(--text); }
+.tip-status.seg-pending  { color: color-mix(in srgb, var(--surface) 55%, transparent); }
+.tip-owner, .tip-due { font-size: 11.5px; color: color-mix(in srgb, var(--surface) 75%, transparent); }
+.tip-owner b { color: var(--surface); }
 
+/* Same flex distribution (equal-width tracks, same 3px gap) as .stage-bar
+   above, so each name sits directly under its own segment instead of
+   wrapping to its own text width and drifting out of alignment. */
 .stage-rail {
-  list-style: none; display: flex; gap: 14px; flex-wrap: wrap;
-  margin: 14px 0 0; padding: 0;
+  list-style: none; display: flex; gap: 3px;
+  margin: 8px 0 0; padding: 0;
 }
 .rail-step {
-  display: flex; align-items: center; gap: 5px;
+  display: flex; align-items: center; justify-content: center; gap: 4px;
+  flex: 1 1 0; min-width: 0;
   font-size: 11.5px; color: var(--text-3); background: none;
+  text-align: center;
+}
+.rail-name {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
 }
 .rail-step.is-hovered { color: var(--text); }
 .rail-step.seg-complete, .rail-step.seg-progress { color: var(--text-2); }
@@ -647,16 +692,20 @@
   grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
 }
 .breakdown-tile {
-  border: 1px solid var(--border); border-left-width: 3px;
+  border: 1px solid var(--border); border-top-width: 3px;
   border-radius: var(--radius-sm); padding: 10px 12px; display: grid; gap: 2px;
 }
 .breakdown-value { font-size: 19px; font-weight: 680; letter-spacing: -.02em; }
 .breakdown-label { font-size: 11px; color: var(--text-3); }
-.tone-tile-green   { border-left-color: var(--green); }
-.tone-tile-accent  { border-left-color: var(--accent); }
-.tone-tile-amber   { border-left-color: var(--amber); }
-.tone-tile-red     { border-left-color: var(--red); }
-.tone-tile-neutral { border-left-color: var(--border-strong); }
+.tone-tile-green   { border-top-color: var(--green);        }
+.tone-tile-green   .breakdown-value { color: var(--green); }
+.tone-tile-accent  { border-top-color: var(--accent);       }
+.tone-tile-accent  .breakdown-value { color: var(--accent); }
+.tone-tile-amber   { border-top-color: var(--amber);        }
+.tone-tile-amber   .breakdown-value { color: var(--amber); }
+.tone-tile-red     { border-top-color: var(--red);          }
+.tone-tile-red     .breakdown-value { color: var(--red); }
+.tone-tile-neutral { border-top-color: var(--border-strong); }
 
 .sr-only {
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;

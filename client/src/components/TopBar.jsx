@@ -1,6 +1,7 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { Bell, Route, ChevronDown } from 'lucide-react';
 import { resolvePageMeta } from '../app/pageMeta.js';
 import { selectPageMeta } from '../features/ui/uiSlice.js';
 import {
@@ -24,6 +25,7 @@ function NotificationBell() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { items, unreadCount, open } = useSelector((s) => s.notifications);
+  const wrapRef = useRef(null);
 
   useEffect(() => {
     dispatch(fetchNotifications());
@@ -32,6 +34,15 @@ function NotificationBell() {
     return () => clearInterval(id);
   }, [dispatch]);
 
+  useEffect(() => {
+    if (!open) return undefined;
+    const onPointerDown = (event) => {
+      if (!wrapRef.current?.contains(event.target)) dispatch(toggleTray(false));
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    return () => document.removeEventListener('mousedown', onPointerDown);
+  }, [open, dispatch]);
+
   const openItem = (n) => {
     if (!n.readAt) dispatch(markNotificationRead(n.id));
     dispatch(toggleTray(false));
@@ -39,14 +50,15 @@ function NotificationBell() {
   };
 
   return (
-    <div className="bell-wrap">
+    <div className="bell-wrap" ref={wrapRef}>
       <button
         type="button" className="btn btn-ghost bell"
         aria-label="Notifications"
         title={unreadCount > 0 ? `Notifications — ${unreadCount} unread` : 'Notifications'}
         onClick={() => dispatch(toggleTray())}
       >
-        ◔{unreadCount > 0 && <span className="bell-dot">{unreadCount > 9 ? '9+' : unreadCount}</span>}
+        <Bell size={17} strokeWidth={2} aria-hidden="true" />
+        {unreadCount > 0 && <span className="bell-dot">{unreadCount > 9 ? '9+' : unreadCount}</span>}
       </button>
 
       {open && (
@@ -91,11 +103,13 @@ function ProfileMenu() {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button type="button" className="profile-trigger">
-          <Avatar size="sm">
-            <AvatarFallback className="bg-brand-soft text-brand">
+          <Avatar className="profile-avatar">
+            <AvatarFallback className="bg-brand text-white">
               {initialsOf(user?.fullName)}
             </AvatarFallback>
           </Avatar>
+          <span className="profile-name">{user?.fullName}</span>
+          <ChevronDown size={14} className="profile-chevron" aria-hidden="true" />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
@@ -128,10 +142,10 @@ export function TopBar({ actionsRef }) {
       <div className="row gap-sm topbar-controls">
         <div ref={actionsRef} className="page-head-actions" />
         <Link
-          className="btn btn-ghost" to="/track" target="_blank" rel="noreferrer"
+          className="btn btn-ghost" to="/track"
           title="Open the public tracking page — clients look a project up by BRD number, no login"
         >
-          ◎ Track
+          <Route size={15} strokeWidth={2} aria-hidden="true" /> Track
         </Link>
         <NotificationBell />
         <ProfileMenu />

@@ -20,6 +20,28 @@ export function Badge({ children, tone = 'neutral' }) {
   return <span className={`badge tone-${tone}`}>{children}</span>;
 }
 
+const PERSON_TONES = ['accent', 'green', 'violet', 'amber', 'red', 'neutral'];
+
+/** A stable tone per person, derived from their name — so a list of
+    different people assigned somewhere doesn't read as one indistinct
+    colour, without needing per-user colour data from the server. */
+export function personTone(name) {
+  const str = name ?? '';
+  let hash = 0;
+  for (let i = 0; i < str.length; i += 1) hash = (hash * 31 + str.charCodeAt(i)) >>> 0;
+  return PERSON_TONES[hash % PERSON_TONES.length];
+}
+
+/** Initials avatar, coloured by `personTone` so each person in a list of
+    assignees is visually distinct at a glance. */
+export function PersonAvatar({ name, className = '' }) {
+  return (
+    <span className={`user-avatar tone-${personTone(name)} ${className}`.trim()}>
+      {(name ?? '?').slice(0, 1)}
+    </span>
+  );
+}
+
 // One bar style used everywhere a completion percentage is shown: a single
 // smooth gradient fill (never per-stage colour blocks — that's what the
 // dedicated StageProgressBar is for) with thin divider ticks cut through it

@@ -19,6 +19,7 @@ function present(user) {
     team: user.team,
     clientName: user.clientName,
     isActive: user.isActive,
+    createdAt: user.createdAt,
     // The UI blocks the app behind a change-password prompt while this is true.
     mustChangePassword: Boolean(user.mustChangePassword),
     role: {

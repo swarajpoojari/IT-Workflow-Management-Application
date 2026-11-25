@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { KeyRound, Users, ShieldCheck, ShieldOff } from 'lucide-react';
+import {
+  KeyRound, Users, ShieldCheck, ShieldOff, FileCog, FolderKanban, Workflow,
+  Paperclip, History, BarChart3, Bug, Settings, Bell, Lock,
+} from 'lucide-react';
 import { fetchRoles, selectRoles, selectModules } from '../features/users/usersSlice.js';
 import { api } from '../api/axiosClient.js';
 import { endpoints } from '../api/endpoints.js';
@@ -18,11 +21,11 @@ import { Tooltip, TooltipTrigger, TooltipContent } from '../components/ui/toolti
  * of this page; only the render layer changed.
  */
 
-/* One glyph per module, so a role card reads at a glance. */
+/* One icon per module, so a role card reads at a glance. */
 const MODULE_ICON = {
-  users: '☰', roles: '⚿', sop: '⛭', projects: '◫', stages: '✦',
-  documents: '▤', audit: '⏱', reports: '◑', bugs: '◉', settings: '⚙',
-  notifications: '◔', auth: '⛨',
+  users: Users, roles: KeyRound, sop: FileCog, projects: FolderKanban, stages: Workflow,
+  documents: Paperclip, audit: History, reports: BarChart3, bugs: Bug, settings: Settings,
+  notifications: Bell, auth: Lock,
 };
 
 const MODULE_LABEL = {
@@ -118,19 +121,23 @@ function RoleCard({ role, modules, totalPermissions, selected, onSelect }) {
         <Badge variant="outline">{scope}</Badge>
       </div>
 
-      <div className="flex flex-wrap gap-1" aria-hidden="true">
+      <div
+        className="grid gap-1" aria-hidden="true"
+        style={{ gridTemplateColumns: `repeat(${modules.length}, minmax(0, 1fr))` }}
+      >
         {modules.map((module) => {
           const on = grantedModules.has(module);
+          const Icon = MODULE_ICON[module];
           return (
             <Tooltip key={module}>
               <TooltipTrigger asChild>
                 <span
                   className={cn(
-                    'flex h-5 w-5 items-center justify-center rounded text-[10px]',
+                    'flex h-6 w-full items-center justify-center rounded',
                     on ? 'bg-brand-soft text-brand' : 'bg-muted text-muted-foreground/50',
                   )}
                 >
-                  {MODULE_ICON[module] ?? '•'}
+                  {Icon ? <Icon size={13} strokeWidth={2} /> : '•'}
                 </span>
               </TooltipTrigger>
               <TooltipContent>
@@ -286,14 +293,16 @@ export function RolePreviewPage() {
             </CardHeader>
             <CardContent>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {Object.entries(byModule).map(([module, actions]) => (
+                {Object.entries(byModule).map(([module, actions]) => {
+                  const Icon = MODULE_ICON[module];
+                  return (
                   <div key={module} className="flex flex-col gap-2">
                     <div className="flex items-center gap-2">
                       <span
                         aria-hidden="true"
-                        className="flex h-5 w-5 items-center justify-center rounded bg-brand-soft text-[10px] text-brand"
+                        className="flex h-5 w-5 items-center justify-center rounded bg-brand-soft text-brand"
                       >
-                        {MODULE_ICON[module] ?? '•'}
+                        {Icon ? <Icon size={12} strokeWidth={2} /> : '•'}
                       </span>
                       <strong className="text-sm">{MODULE_LABEL[module] ?? module}</strong>
                     </div>
@@ -303,7 +312,8 @@ export function RolePreviewPage() {
                       ))}
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </CardContent>
           </Card>

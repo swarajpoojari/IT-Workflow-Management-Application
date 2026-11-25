@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { useSearchParams } from 'react-router-dom';
 import {
   fetchAuditLog, fetchAuditFilters, setAuditFilter,
   selectAuditItems, selectAuditPagination, selectAuditFilters,
@@ -17,7 +18,9 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '../components/ui/dialog.jsx';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../components/ui/select.jsx';
 import { cn } from 'cn';
+import { History } from 'lucide-react';
 
 const ACTION_VARIANT = {
   CREATE: 'green', ACTIVATE: 'green', SIGNOFF: 'green',
@@ -127,6 +130,7 @@ export function AuditLogPage() {
 
   const [detail, setDetail] = useState(null);
   const [exporting, setExporting] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => { dispatch(fetchAuditFilters()); }, [dispatch]);
 
@@ -168,6 +172,15 @@ export function AuditLogPage() {
     }
   };
 
+  // Quick-action deep link ("/audit?action=export") triggers the CSV
+  // export once, then drops the param.
+  useEffect(() => {
+    if (searchParams.get('action') !== 'export') return;
+    exportCsv();
+    setSearchParams((params) => { params.delete('action'); return params; }, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
   return (
     <>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -188,19 +201,31 @@ export function AuditLogPage() {
 
       <div className="card card-pad mb-4">
         <div className="row">
-          <select value={filters.entityType} onChange={(e) => update({ entityType: e.target.value })} style={{ width: 190 }}>
-            <option value="">All modules</option>
-            {options.entityTypes.map((type) => (
-              <option key={type} value={type}>{ENTITY_LABEL[type] ?? type}</option>
-            ))}
-          </select>
+          <Select
+            value={filters.entityType || 'ALL'}
+            onValueChange={(v) => update({ entityType: v === 'ALL' ? '' : v })}
+          >
+            <SelectTrigger style={{ width: 190 }}><SelectValue placeholder="All modules" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All modules</SelectItem>
+              {options.entityTypes.map((type) => (
+                <SelectItem key={type} value={type}>{ENTITY_LABEL[type] ?? type}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-          <select value={filters.action} onChange={(e) => update({ action: e.target.value })} style={{ width: 180 }}>
-            <option value="">All actions</option>
-            {options.actions.map((action) => (
-              <option key={action} value={action}>{ACTION_LABEL[action] ?? action}</option>
-            ))}
-          </select>
+          <Select
+            value={filters.action || 'ALL'}
+            onValueChange={(v) => update({ action: v === 'ALL' ? '' : v })}
+          >
+            <SelectTrigger style={{ width: 180 }}><SelectValue placeholder="All actions" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All actions</SelectItem>
+              {options.actions.map((action) => (
+                <SelectItem key={action} value={action}>{ACTION_LABEL[action] ?? action}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
           <input type="date" value={filters.dateFrom} onChange={(e) => update({ dateFrom: e.target.value })} style={{ width: 165 }} title="From date" />
           <input type="date" value={filters.dateTo} onChange={(e) => update({ dateTo: e.target.value })} style={{ width: 165 }} title="To date" />
@@ -216,6 +241,12 @@ export function AuditLogPage() {
       </div>
 
       <div className="card">
+        <div className="card-head bare">
+          <div className="card-head-title">
+            <span className="panel-icon is-accent" aria-hidden="true"><History size={16} /></span>
+            <h3>Audit log</h3>
+          </div>
+        </div>
         {status === 'loading' && !items.length ? (
           <Spinner label="Loading audit entries…" />
         ) : items.length === 0 ? (

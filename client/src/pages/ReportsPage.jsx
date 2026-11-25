@@ -1,9 +1,10 @@
 import { useEffect, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { FolderKanban, Layers, AlertTriangle, Bug } from 'lucide-react';
 import { fetchReports } from '../features/reports/reportsSlice.js';
 import { downloadCsv } from '../lib/csv.js';
+import { formatDate } from '../lib/date.js';
 import { ErrorNote, Spinner, EmptyState, KpiCard } from '../components/ui/Bits.jsx';
 import { Badge } from '../components/ui/badge.jsx';
 import { Avatar, AvatarFallback } from '../components/ui/avatar.jsx';
@@ -44,6 +45,7 @@ function TeamStack({ names }) {
 export function ReportsPage() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const data = useSelector((s) => s.reports.data);
   const status = useSelector((s) => s.reports.status);
   const error = useSelector((s) => s.reports.error);
@@ -57,11 +59,8 @@ export function ReportsPage() {
       .reduce((acc, b) => ({ ...acc, [b.severity]: (acc[b.severity] || 0) + b.total }), {});
   }, [data]);
 
-  if (status === 'loading' && !data) return <Spinner label="Building reports…" />;
-  if (error) return <ErrorNote error={error} />;
-  if (!data) return null;
-
   const exportProjects = () => {
+    if (!data) return;
     downloadCsv(`project-report-${new Date().toISOString().slice(0, 10)}.csv`, data.projects, [
       { label: 'Code', value: (p) => p.code },
       { label: 'Project', value: (p) => p.name },
@@ -74,6 +73,19 @@ export function ReportsPage() {
       { label: 'Target end date', value: (p) => p.targetEndDate ?? '' },
     ]);
   };
+
+  // Quick-action deep link ("/reports?action=export") triggers the CSV
+  // download once data is ready, then drops the param.
+  useEffect(() => {
+    if (searchParams.get('action') !== 'export' || !data) return;
+    exportProjects();
+    setSearchParams((params) => { params.delete('action'); return params; }, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, data]);
+
+  if (status === 'loading' && !data) return <Spinner label="Building reports…" />;
+  if (error) return <ErrorNote error={error} />;
+  if (!data) return null;
 
   return (
     <div className="stack">
@@ -138,7 +150,7 @@ export function ReportsPage() {
                   </div>
                 </TableCell>
                 <TableCell className="whitespace-nowrap text-muted-foreground">
-                  {p.targetEndDate ?? '—'}
+                  {formatDate(p.targetEndDate) ?? '—'}
                 </TableCell>
               </TableRow>
             ))}

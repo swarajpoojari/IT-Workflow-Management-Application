@@ -116,11 +116,27 @@
 .draft-stage:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
 .draft-stage:active { cursor: grabbing; }
 
-.draft-stage.is-dragging { opacity: .45; transform: scale(.995); }
+/* While a card is being dragged, the original slot collapses to a faint
+   placeholder (content still legible but visibly "lifted out"), rather than
+   just dimming the whole card in place — closer to how a native sortable
+   list reads mid-drag. */
+.draft-stage.is-dragging {
+  opacity: .5; background: var(--surface-2);
+  border-style: dashed; border-color: var(--border-strong);
+  box-shadow: none; transform: none;
+}
 .draft-stage.is-drop-target {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  box-shadow: 0 0 0 3px var(--accent-soft), var(--shadow-sm, var(--shadow));
+  transform: translateY(-1px);
 }
+
+.drag-handle {
+  display: grid; place-items: center; flex: 0 0 auto;
+  width: 1.1rem; color: var(--text-3); cursor: grab;
+  align-self: stretch;
+}
+.draft-stage:active .drag-handle { cursor: grabbing; }
 
 .stage-index {
   display: grid;
@@ -276,6 +292,7 @@
   vertical-align: middle;
 }
 .immutable-chip {
+  display: inline-flex; align-items: center; gap: 4px;
   padding: .15rem .55rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-xs);

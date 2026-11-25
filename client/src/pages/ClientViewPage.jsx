@@ -9,6 +9,7 @@ import {
 import { selectUser } from '../features/auth/authSlice.js';
 import { Badge, ErrorNote, ProgressBar, Spinner, StatusBadge, KpiCard } from '../components/ui/Bits.jsx';
 import { usePageMeta } from '../hooks/usePageMeta.js';
+import { formatDate } from '../lib/date.js';
 
 export function ClientViewPage() {
   const { id } = useParams();
@@ -24,12 +25,17 @@ export function ClientViewPage() {
 
   usePageMeta(
     project?.name,
-    project ? `${project.clientName} · Target completion ${project.targetEndDate ?? 'TBC'}` : '',
+    project ? `${project.clientName} · Target completion ${formatDate(project.targetEndDate) ?? 'TBC'}` : '',
   );
 
-  if (status === 'loading' && !project) return <Spinner label="Loading project…" />;
-  if (error) return <ErrorNote error={error} />;
-  if (!project) return null;
+  // Same guard as ProjectDetailPage: `current` can briefly hold a lighter
+  // payload (no `progress`) right after a create/update elsewhere — wait for
+  // the full shape before rendering against it.
+  const projectReady = project && String(project.id) === String(id) && project.progress;
+  if (!projectReady) {
+    if (status === 'loading' || !error) return <Spinner label="Loading project…" />;
+    return <ErrorNote error={error} />;
+  }
 
   return (
     <>

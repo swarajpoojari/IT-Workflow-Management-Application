@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useParams, Link, useNavigate } from 'react-router-dom';
+import { GripVertical, FileCog, History as HistoryIcon, Lock } from 'lucide-react';
 import {
   fetchTemplates, fetchTemplate, createTemplate,
   addStage, updateStage, deleteStage, reorderStages, publishTemplate,
@@ -436,7 +437,9 @@ export function SopBuilderPage({ isNew: isNewProp = false }) {
 
   /** Commits a new order to the server; the draft re-fetches on success. */
   const commitOrder = (ordered) => {
-    dispatch(reorderStages({ templateId: template.id, stageIds: ordered.map((s) => s.id) }));
+    dispatch(reorderStages({ templateId: template.id, stageIds: ordered.map((s) => s.id) })).then((result) => {
+      if (!result.error) dispatch(pushToast('Stage Re-ordered', 'success'));
+    });
   };
 
   const moveTo = (from, to) => {
@@ -584,17 +587,20 @@ export function SopBuilderPage({ isNew: isNewProp = false }) {
           {/* ── Draft sequence ── */}
           <section className="card builder-draft">
             <div className="card-head">
-              <div>
-                <h2>
-                  <span className="draft-dot" aria-hidden="true" />
-                  Draft — version {draft.version}
-                  <span className="editable-chip">Editable</span>
-                </h2>
-                <small>
-                  {isNew
-                    ? 'Not created yet · name it to start adding stages'
-                    : `${draftStages.length} stage${draftStages.length === 1 ? '' : 's'} sequenced · saved as you go`}
-                </small>
+              <div className="card-head-title">
+                <span className="panel-icon is-accent" aria-hidden="true"><FileCog size={16} /></span>
+                <div>
+                  <h2>
+                    <span className="draft-dot" aria-hidden="true" />
+                    Draft — version {draft.version}
+                    <span className="editable-chip">Editable</span>
+                  </h2>
+                  <small>
+                    {isNew
+                      ? 'Not created yet · name it to start adding stages'
+                      : `${draftStages.length} stage${draftStages.length === 1 ? '' : 's'} sequenced · saved as you go`}
+                  </small>
+                </div>
               </div>
               {canEdit && !isNew && (
                 <button type="button" className="btn btn-sm" onClick={() => setStageDialog({})}>
@@ -652,6 +658,11 @@ export function SopBuilderPage({ isNew: isNewProp = false }) {
                           }}
                           onKeyDown={(e) => onCardKeyDown(e, index)}
                         >
+                          {canEdit && (
+                            <span className="drag-handle" aria-hidden="true">
+                              <GripVertical size={15} strokeWidth={2} />
+                            </span>
+                          )}
                           <span className="stage-index" aria-hidden="true">{stage.sequence}</span>
 
                           <div className="draft-stage-body">
@@ -720,9 +731,12 @@ export function SopBuilderPage({ isNew: isNewProp = false }) {
           <aside className="builder-rail">
             <section className="card card-pad">
               <div className="card-head bare">
-                <div>
-                  <h3>Version history</h3>
-                  <p className="muted xsmall">Immutable audit trail</p>
+                <div className="card-head-title">
+                  <span className="panel-icon" aria-hidden="true"><HistoryIcon size={16} /></span>
+                  <div>
+                    <h3>Version history</h3>
+                    <p className="muted xsmall">Immutable audit trail</p>
+                  </div>
                 </div>
                 <span className="stage-counter">
                   {isNew ? 1 : template.versions.length} version{(isNew ? 1 : template.versions.length) === 1 ? '' : 's'}
@@ -785,14 +799,17 @@ export function SopBuilderPage({ isNew: isNewProp = false }) {
             {!isNew && template.publishedVersion ? (
               <section className="card card-pad">
                 <div className="card-head bare">
-                  <div>
-                    <h3>
-                      Live version — v{template.publishedVersion.version}
-                      <span className="live-dot" aria-hidden="true" />
-                    </h3>
-                    <p className="muted xsmall">frozen · used by new projects</p>
+                  <div className="card-head-title">
+                    <span className="panel-icon is-green" aria-hidden="true"><Lock size={16} /></span>
+                    <div>
+                      <h3>
+                        Live version — v{template.publishedVersion.version}
+                        <span className="live-dot" aria-hidden="true" />
+                      </h3>
+                      <p className="muted xsmall">frozen · used by new projects</p>
+                    </div>
                   </div>
-                  <span className="immutable-chip">⛉ Immutable</span>
+                  <span className="immutable-chip"><Lock size={11} strokeWidth={2} aria-hidden="true" /> Immutable</span>
                 </div>
 
                 <p className="muted xsmall compare-intro">

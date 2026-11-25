@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
+import { Layers, Users as UsersIcon } from 'lucide-react';
 import {
   previewStages, createProject, clearPreview, clearProjectsError,
   selectPreview, selectCreateStatus, selectProjectsError,
@@ -147,13 +148,16 @@ export function CreateProjectPage() {
 
         <div className="card">
           <div className="card-head">
-            <div>
-              <h2>Stages to be generated</h2>
-              <small>
-                {preview.data
-                  ? `From "${preview.data.template.name}" v${preview.data.sopVersion.version} (published ${preview.data.sopVersion.publishedAt?.slice(0, 10)})`
-                  : 'Select an SOP template to preview'}
-              </small>
+            <div className="card-head-title">
+              <span className="panel-icon is-accent" aria-hidden="true"><Layers size={16} /></span>
+              <div>
+                <h2>Stages to be generated</h2>
+                <small>
+                  {preview.data
+                    ? `From "${preview.data.template.name}" v${preview.data.sopVersion.version} (published ${preview.data.sopVersion.publishedAt?.slice(0, 10)})`
+                    : 'Select an SOP template to preview'}
+                </small>
+              </div>
             </div>
             {preview.data && <Badge tone="violet">v{preview.data.sopVersion.version}</Badge>}
           </div>
@@ -178,7 +182,9 @@ export function CreateProjectPage() {
                       <strong>{stage.name}</strong>
                       {stage.description && <div className="muted" style={{ fontSize: 12.5 }}>{stage.description}</div>}
                       {stage.defaultOwnerTeamName && (
-                        <div className="muted xsmall">◌ {stage.defaultOwnerTeamName}</div>
+                        <div className="muted xsmall row-inline-icon">
+                          <UsersIcon size={11} strokeWidth={2} aria-hidden="true" /> {stage.defaultOwnerTeamName}
+                        </div>
                       )}
                     </div>
                     <Badge tone={stage.clientVisible ? 'green' : 'neutral'}>
@@ -190,12 +196,15 @@ export function CreateProjectPage() {
                 {involvedTeams.length > 0 && (
                   <div className="involved-teams">
                     <div className="card-head bare">
-                      <div>
-                        <h3>Teams this SOP commits</h3>
-                        <p className="muted xsmall">
-                          Each stage arrives already routed to its team. Only that team&apos;s active
-                          members can be made its owner.
-                        </p>
+                      <div className="card-head-title">
+                        <span className="panel-icon is-violet" aria-hidden="true"><UsersIcon size={16} /></span>
+                        <div>
+                          <h3>Teams this SOP commits</h3>
+                          <p className="muted xsmall">
+                            Each stage arrives already routed to its team. Only that team&apos;s active
+                            members can be made its owner.
+                          </p>
+                        </div>
                       </div>
                     </div>
 

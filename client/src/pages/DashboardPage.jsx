@@ -8,9 +8,10 @@ import {
 import {
   FolderKanban, Clock, PauseCircle, AlertTriangle, Gauge,
   TrendingUp, Zap, PieChart as PieChartIcon, ListChecks, BellRing, Activity,
-  FileCog, Users, KeyRound, FilePlus, History as HistoryIcon, Settings as SettingsIcon,
-  ChevronRight, ClipboardCheck, ChevronDown,
+  FileCog, FilePlus,
+  ChevronRight, ClipboardCheck, ChevronDown, Calendar,
   CirclePlus, CircleCheck, Pencil, Trash2, UserPlus, Upload, ArrowUpDown,
+  Building2, Download,
 } from 'lucide-react';
 import {
   fetchProjectSummary,
@@ -124,6 +125,7 @@ function DateRangeControl({ value, onChange }) {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button type="button" className="btn btn-secondary date-range-trigger">
+          <Calendar size={14} aria-hidden="true" />
           {current.label}
           <ChevronDown size={14} aria-hidden="true" />
         </button>
@@ -177,10 +179,10 @@ function RecentActivity({ items }) {
     <section className="card card-pad">
       <div className="card-head bare">
         <div className="card-head-title">
-          <span className="panel-icon" aria-hidden="true"><Activity size={16} /></span>
+          <span className="panel-icon is-accent" aria-hidden="true"><Activity size={16} /></span>
           <div>
             <h3>Recent activity</h3>
-            <p className="muted xsmall">Latest entries from the audit trail, within the selected range.</p>
+            {/* <p className="muted xsmall">Latest entries from the audit trail, within the selected range.</p> */}
           </div>
         </div>
         <Link to="/audit" className="xsmall panel-link">View all <ChevronRight size={13} /></Link>
@@ -219,12 +221,12 @@ function RecentActivity({ items }) {
 
 /* ── Quick actions ────────────────────────────────────────────────────────── */
 const QUICK_ACTIONS = [
-  { to: '/sop',          icon: FileCog,      label: 'SOP Builder',     hint: 'Author and publish stage templates', require: ['sop', 'update'] },
-  { to: '/users',        icon: Users,        label: 'User Management', hint: 'Invite people, manage roles and teams', require: ['users', 'create'] },
-  { to: '/roles',        icon: KeyRound,     label: 'Roles',           hint: 'Review what each role can reach', require: ['roles', 'read'] },
-  { to: '/projects/new', icon: FilePlus,     label: 'New project',     hint: 'Generate a board from a published SOP', require: ['projects', 'create'] },
-  { to: '/audit',        icon: HistoryIcon,  label: 'Audit Log',       hint: 'Every change, append-only', require: ['audit', 'read'] },
-  { to: '/settings',     icon: SettingsIcon, label: 'Settings',        hint: 'System configuration and preferences' },
+  { to: '/sop',                       icon: FileCog,   label: 'SOP Builder',      hint: 'Author and publish stage templates', require: ['sop', 'update'] },
+  { to: '/users?action=create-team',  icon: Building2, label: 'Create Team',      hint: 'Add a new team', require: ['users', 'create'] },
+  { to: '/users?action=create-user',  icon: UserPlus,  label: 'Create User',      hint: 'Invite a new person', require: ['users', 'create'] },
+  { to: '/projects/new',              icon: FilePlus,  label: 'New project',      hint: 'Generate a board from a published SOP', require: ['projects', 'create'] },
+  { to: '/reports?action=export',     icon: Download,  label: 'Export Report',    hint: 'Download the project report CSV', require: ['reports', 'read'] },
+  { to: '/audit?action=export',       icon: Download,  label: 'Export Audit Log', hint: 'Download the audit trail CSV', require: ['audit', 'read'] },
 ];
 
 function QuickActions() {
@@ -239,7 +241,7 @@ function QuickActions() {
           <span className="panel-icon is-accent" aria-hidden="true"><Zap size={16} /></span>
           <div>
             <h3>Quick actions</h3>
-            <p className="muted xsmall rail-sub">Get things done faster.</p>
+            {/* <p className="muted xsmall rail-sub">Get things done faster.</p> */}
           </div>
         </div>
       </div>
@@ -367,25 +369,19 @@ export function DashboardPage() {
       {headingActions && createPortal(<DateRangeControl value={range} onChange={setRange} />, headingActions)}
 
       <div className="kpi-row dash-kpi-row">
-        <KpiCard icon={FolderKanban} label="Total projects" value={stats.total} sub={`${stats.inProgress} in progress`} tone="accent" to="/projects" />
-        <KpiCard icon={Clock} label="Pending" value={stats.pending} sub="Not started yet" tone="neutral" />
-        <KpiCard icon={PauseCircle} label="On hold" value={stats.onHold} sub="Paused by an owner" tone="red" />
-        <KpiCard icon={AlertTriangle} label="At risk" value={stats.atRisk} sub={`${stats.blockedStages} blocked stage${stats.blockedStages === 1 ? '' : 's'}`} tone="amber" />
-        <KpiCard icon={Gauge} label="Avg. progress" value={`${stats.averageProgress}%`} sub={`${stats.completed} completed`} tone="green" ring={stats.averageProgress} />
+        <KpiCard icon={FolderKanban} label="Total projects" value={stats.total} tone="accent" to="/projects" />
+        <KpiCard icon={Clock} label="Pending" value={stats.pending} tone="neutral" to="/projects?status=NOT_STARTED" />
+        <KpiCard icon={PauseCircle} label="On hold" value={stats.onHold} tone="red" to="/projects?status=ON_HOLD" />
+        <KpiCard icon={AlertTriangle} label="At risk" value={stats.atRisk}  tone="amber" to="/projects?status=AT_RISK" />
+        <KpiCard icon={Gauge} label="Avg. progress" value={`${stats.averageProgress}%`} tone="green" ring={stats.averageProgress} />
       </div>
 
       <div className="dash-row">
         <section className="card card-pad">
           <div className="card-head bare">
             <div className="card-head-title">
-              <span className="panel-icon" aria-hidden="true"><TrendingUp size={16} /></span>
-              <div>
-                <h3>Delivery pressure</h3>
-                <p className="muted xsmall">
-                  Open projects by how close their target date is, as of now — this panel does not
-                  change with the selected range.
-                </p>
-              </div>
+              <span className="panel-icon is-amber" aria-hidden="true"><TrendingUp size={16} /></span>
+              <h3>Delivery pressure</h3>
             </div>
             <span className="chart-legend-note">far out → overdue</span>
           </div>
@@ -426,10 +422,10 @@ export function DashboardPage() {
         <section className="card card-pad">
           <div className="card-head bare">
             <div className="card-head-title">
-              <span className="panel-icon" aria-hidden="true"><PieChartIcon size={16} /></span>
+              <span className="panel-icon is-violet" aria-hidden="true"><PieChartIcon size={16} /></span>
               <div>
                 <h3>Project Summary</h3>
-                <p className="muted xsmall">As of now — not affected by the selected range.</p>
+                {/* <p className="muted xsmall">As of now — not affected by the selected range.</p> */}
               </div>
             </div>
           </div>
@@ -439,7 +435,7 @@ export function DashboardPage() {
                 <PieChart>
                   <Pie
                     data={statusSeries} dataKey="value" nameKey="label"
-                    innerRadius={44} outerRadius={62} paddingAngle={2} strokeWidth={0}
+                    innerRadius={44} outerRadius={62} paddingAngle={4} strokeWidth={0}
                   >
                     {statusSeries.map((entry) => (
                       <Cell key={entry.status} fill={theme[STATUS_COLOR[entry.status] ?? 'slate']} />
@@ -473,10 +469,10 @@ export function DashboardPage() {
         <section className="card card-pad">
           <div className="card-head bare">
             <div className="card-head-title">
-              <span className="panel-icon" aria-hidden="true"><ListChecks size={16} /></span>
+              <span className="panel-icon is-green" aria-hidden="true"><ListChecks size={16} /></span>
               <div>
                 <h3>Active projects</h3>
-                <p className="muted xsmall">Open work, least complete first. As of now.</p>
+                {/* <p className="muted xsmall">Open work, least complete first. As of now.</p> */}
               </div>
             </div>
             <Link to="/projects" className="xsmall panel-link">View all <ChevronRight size={13} /></Link>
@@ -512,7 +508,7 @@ export function DashboardPage() {
               <span className="panel-icon is-red" aria-hidden="true"><BellRing size={16} /></span>
               <div>
                 <h3>Needs attention</h3>
-                <p className="muted xsmall rail-sub">Due within a fortnight, blocked, or on hold. As of now.</p>
+                {/* <p className="muted xsmall rail-sub">Due within a fortnight, blocked, or on hold. As of now.</p> */}
               </div>
             </div>
             <Link to="/projects" className="xsmall panel-link">View all <ChevronRight size={13} /></Link>
@@ -561,7 +557,7 @@ export function DashboardPage() {
               Explore Reports <ChevronRight size={13} />
             </Link>
           </div>
-          <span className="promo-illustration" aria-hidden="true"><ClipboardCheck size={34} /></span>
+          <span className="promo-illustration" aria-hidden="true"><ClipboardCheck size={136} /></span>
         </section>
       </div>
     </div>

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { useSearchParams } from 'react-router-dom';
 import {
   fetchUsers, fetchRoles, createUser, deactivateUser, activateUser, deleteUser,
   reassignAssignments, closeReassignModal, clearUsersError, clearInvite,
@@ -10,7 +11,7 @@ import {
 } from '../features/users/usersSlice.js';
 import { usePermission } from '../hooks/usePermission.js';
 import { Modal } from '../components/ui/Modal.jsx';
-import { Badge, ErrorNote, Field, Spinner, StatusBadge, KpiCard } from '../components/ui/Bits.jsx';
+import { Badge, ErrorNote, Field, Spinner, StatusBadge, KpiCard, PersonAvatar } from '../components/ui/Bits.jsx';
 import { Users as UsersIcon, Building2, Hourglass, KeyRound } from 'lucide-react';
 import { TeamCard } from '../components/ui/TeamCard.jsx';
 import { pushToast } from '../features/ui/uiSlice.js';
@@ -619,12 +620,23 @@ export function UserManagementPage() {
   const [teamDialog, setTeamDialog] = useState(null);   // { team } | { } for new
   const [teamToDelete, setTeamToDelete] = useState(null);
   const [userToDelete, setUserToDelete] = useState(null);
+  const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
     dispatch(fetchUsers());
     dispatch(fetchRoles());
     dispatch(fetchTeams());
   }, [dispatch]);
+
+  // Quick-action deep links ("/users?action=create-team") open the matching
+  // dialog once, then drop the param so a refresh doesn't reopen it.
+  useEffect(() => {
+    const action = searchParams.get('action');
+    if (!action) return;
+    if (action === 'create-team' && canCreate) setTeamDialog({});
+    if (action === 'create-user' && canCreate) setCreating(true);
+    setSearchParams((params) => { params.delete('action'); return params; }, { replace: true });
+  }, [searchParams, setSearchParams, canCreate]);
 
   const filtered = useMemo(() => users.filter((user) => {
     const term = search.trim().toLowerCase();
@@ -663,21 +675,21 @@ export function UserManagementPage() {
         onDelete={(team) => setTeamToDelete(team)}
       />
 
-      <section className="card">
-        <div className="card-head">
-          <div className="row gap-sm">
-            <input
-              type="text" placeholder="Search name or email…" value={search}
-              onChange={(e) => setSearch(e.target.value)} style={{ width: 230 }}
-            />
-            <select value={teamFilter} onChange={(e) => setTeamFilter(e.target.value)} style={{ width: 170 }}>
-              <option value="">All teams</option>
-              {teams.map((t) => <option key={t.id} value={String(t.id)}>{t.name}</option>)}
-            </select>
-          </div>
-          {canCreate && <button type="button" className="btn" onClick={() => setCreating(true)}>+ New user</button>}
+      <div className="row between" style={{ marginBottom: 16 }}>
+        <div className="row gap-sm">
+          <input
+            type="text" placeholder="Search name or email…" value={search}
+            onChange={(e) => setSearch(e.target.value)} style={{ width: 230 }}
+          />
+          <select value={teamFilter} onChange={(e) => setTeamFilter(e.target.value)} style={{ width: 170 }}>
+            <option value="">All teams</option>
+            {teams.map((t) => <option key={t.id} value={String(t.id)}>{t.name}</option>)}
+          </select>
         </div>
+        {canCreate && <button type="button" className="btn" onClick={() => setCreating(true)}>+ New user</button>}
+      </div>
 
+      <section className="card">
         {status === 'loading' && !users.length ? (
           <Spinner label="Loading users…" />
         ) : (
@@ -691,7 +703,7 @@ export function UserManagementPage() {
                   <tr key={user.id}>
                     <td>
                       <div className="user-cell">
-                        <span className="user-avatar">{user.fullName.slice(0, 1)}</span>
+                        <PersonAvatar name={user.fullName} />
                         <span>
                           <strong>{user.fullName}</strong>
                           <small className="muted">{user.email}</small>
@@ -719,10 +731,20 @@ export function UserManagementPage() {
                           <button
                             type="button" className="btn btn-success btn-sm"
                             onClick={() => dispatch(activateUser(user.id)).then((r) => {
-                              if (!r.error) dispatch(pushToast(`${user.fullName} activated.`, 'success'));
+                              if (!r.error) dispatch(pushToast(`${user.fullName} reactivated.`, 'success'));
                             })}
                           >
-                            Activate
+                            Reactivate
+                          </button>
+                        )}
+                        {user.isActive && canDeactivate && (
+                          <button
+                            type="button" className="btn btn-secondary btn-sm"
+                            onClick={() => dispatch(deactivateUser(user.id)).then((r) => {
+                              if (!r.error) dispatch(pushToast(`${user.fullName} deactivated.`, 'success'));
+                            })}
+                          >
+                            Deactivate
                           </button>
                         )}
                         {canDelete && (

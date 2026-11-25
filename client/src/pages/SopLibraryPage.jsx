@@ -2,6 +2,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import {
+  FileCog, FileText, Layers, Workflow, Boxes, GitBranch,
+  CheckCircle2, CircleDot, AlertTriangle, ChevronRight,
+} from 'lucide-react';
+import {
   fetchTemplates, clearSopError,
   selectTemplates, selectSopError, selectSopStatus,
 } from '../features/sop/sopSlice.js';
@@ -15,9 +19,9 @@ const FILTERS = [
   ['archived', 'Archived'],
 ];
 
-/** A stable glyph per template, so a card is recognisable at a glance. */
-const GLYPHS = ['◧', '◨', '◩', '◪', '⬒', '⬓'];
-const glyphFor = (id) => GLYPHS[id % GLYPHS.length];
+/** A stable icon per template, so a card is recognisable at a glance. */
+const ICONS = [FileCog, FileText, Layers, Workflow, Boxes, GitBranch];
+const iconFor = (id) => ICONS[id % ICONS.length];
 
 function relativeTime(value) {
   if (!value) return null;
@@ -43,11 +47,12 @@ function SopCard({ template, onOpen }) {
   const stages = template.stages ?? [];
   const stageCount = template.stageCount ?? stages.length;
   const activeProjects = template.activeProjectCount ?? template.projectCount ?? 0;
+  const Icon = iconFor(template.id);
 
   return (
     <article className="sop-card">
       <div className="sop-card-top">
-        <span className="sop-glyph" aria-hidden="true">{glyphFor(template.id)}</span>
+        <span className="sop-glyph" aria-hidden="true"><Icon size={17} strokeWidth={2} /></span>
 
         <div className="sop-card-ident">
           <div className="sop-card-title">
@@ -64,7 +69,12 @@ function SopCard({ template, onOpen }) {
             <dt>Projects</dt>
             <dd>
               {activeProjects > 0
-                ? <span className="meta-live">✓ {activeProjects} Active{live ? ` (v${live.version})` : ''}</span>
+                ? (
+                  <span className="meta-live">
+                    <CheckCircle2 size={12} strokeWidth={2} aria-hidden="true" />
+                    {' '}{activeProjects} Active{live ? ` (v${live.version})` : ''}
+                  </span>
+                )
                 : <span className="muted">None yet</span>}
             </dd>
           </div>
@@ -85,7 +95,7 @@ function SopCard({ template, onOpen }) {
       <div className="sop-stages-row">
         <div className="sop-stages-head">
           <span className="sop-stages-label">
-            ⊶ Workflow stages ({stageCount} {stageCount === 1 ? 'stage' : 'stages'} sequenced)
+            <GitBranch size={11} strokeWidth={2} aria-hidden="true" /> Workflow stages ({stageCount} {stageCount === 1 ? 'stage' : 'stages'} sequenced)
           </span>
           {template.estimatedCycleDays > 0 && (
             <span className="muted xsmall">Estimated cycle: {template.estimatedCycleDays} days</span>
@@ -109,7 +119,9 @@ function SopCard({ template, onOpen }) {
                 >
                   <b>{stage.sequence}</b> {stage.name}
                 </span>
-                {index < stages.length - 1 && <span className="chain-arrow" aria-hidden="true">→</span>}
+                {index < stages.length - 1 && (
+                  <span className="chain-arrow" aria-hidden="true"><ChevronRight size={13} strokeWidth={2} /></span>
+                )}
               </li>
             ))}
           </ol>
@@ -118,9 +130,15 @@ function SopCard({ template, onOpen }) {
 
       <footer className="sop-card-foot">
         <span className="sop-card-note">
-          {draft && live && <>● Live projects unaffected by v{draft.version} draft changes</>}
-          {live && !draft && <>✓ Production baseline locked · v{live.version}</>}
-          {!live && <>⚠ Not published yet — no project can use this SOP</>}
+          {draft && live && (
+            <><CircleDot size={12} strokeWidth={2} aria-hidden="true" /> Live projects unaffected by v{draft.version} draft changes</>
+          )}
+          {live && !draft && (
+            <><CheckCircle2 size={12} strokeWidth={2} aria-hidden="true" /> Production baseline locked · v{live.version}</>
+          )}
+          {!live && (
+            <><AlertTriangle size={12} strokeWidth={2} aria-hidden="true" /> Not published yet — no project can use this SOP</>
+          )}
         </span>
 
         <div className="row gap-sm">

@@ -51,17 +51,18 @@
   top: 0;
   z-index: 30;
   min-height: 64px;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
-  background: color-mix(in srgb, var(--surface) 94%, transparent);
-  backdrop-filter: blur(14px);
+  /* border-bottom: 1px solid var(--border); */
+  /* background: var(--surface); */
+  /* background: color-mix(in srgb, var(--surface) 94%, transparent); */
+  background: #f5f7fb
+  /* backdrop-filter: blur(14px); */
 }
 
 @supports not (backdrop-filter: blur(1px)) {
   .topbar { background: var(--surface); }
 }
 
-.topbar-title { font-weight: 750; letter-spacing: -.035em; }
+.topbar-title { font-weight: 750; letter-spacing: -.025em; }
 
 /* ── Cards and panels ────────────────────────────────────────────────────── */
 .card {
@@ -70,10 +71,10 @@
 }
 
 .card-head {
-  padding: 1.25rem;
+  padding: .8rem 1em;
   border-bottom: 1px solid var(--border);
 }
-.card-head.bare { padding-bottom: .4rem; }
+.card-head.bare { padding-bottom: 1rem; padding-left: 1rem;}
 
 .card-pad { padding: 1.25rem; }
 
@@ -326,7 +327,7 @@ td strong, td b { color: var(--text); font-weight: 650; }
 
 /* ── Content width ───────────────────────────────────────────────────────── */
 .content {
-  padding: 1.5rem clamp(1rem, 3vw, 2.5rem) 3rem;
+  padding: 1rem clamp(1rem, 3vw, 1rem) 3rem;
   max-width: 1440px;
 }
 

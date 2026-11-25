@@ -151,7 +151,9 @@ export function StageDrawer({ projectId, stageId, onClose }) {
     if (stageId) dispatch(fetchStageDetail({ projectId, stageId }));
   }, [dispatch, projectId, stageId]);
 
-  const stage = detail?.stage;
+  // `detail` can still hold the previous stage's payload while this one's
+  // fetch is in flight — only trust it once it actually matches `stageId`.
+  const stage = detail?.stage?.id === stageId ? detail.stage : null;
   const isTesting = stage?.stageType === 'TESTING';
 
   useEffect(() => {
@@ -164,10 +166,12 @@ export function StageDrawer({ projectId, stageId, onClose }) {
     return () => window.removeEventListener('keydown', onEsc);
   }, [onClose]);
 
-  if (status === 'loading' || !stage) {
+  if (!stage) {
     return (
       <aside className="drawer" role="dialog" aria-label="Stage detail">
-        <Spinner label="Loading stage…" />
+        {status === 'failed'
+          ? <ErrorNote error={{ message: 'This stage could not be loaded.' }} />
+          : <Spinner label="Loading stage…" />}
       </aside>
     );
   }

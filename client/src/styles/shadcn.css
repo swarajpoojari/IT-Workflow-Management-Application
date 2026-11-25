@@ -105,3 +105,16 @@
   --color-neutral: var(--slate);
   --color-neutral-soft: var(--slate-soft);
 }
+
+/* shadcn's own scaffold normally ships this exact rule so every component's
+   bare `border` utility (no explicit colour class) resolves to the theme's
+   border token instead of inheriting `currentColor` — this file skipped it,
+   which is why dropdowns/popovers/dialogs rendered a harsher, text-coloured
+   edge than hand-styled pieces like the notification tray, which set
+   `border: 1px solid var(--border)` explicitly. One rule fixes every
+   shadcn-based modal/menu at once rather than patching each component. */
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+}

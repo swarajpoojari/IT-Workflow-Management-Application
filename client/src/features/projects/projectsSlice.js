@@ -111,8 +111,11 @@ const projectsSlice = createSlice({
       .addCase(createProject.pending, (state) => { state.createStatus = 'loading'; state.error = null; })
       .addCase(createProject.fulfilled, (state, action) => {
         state.createStatus = 'succeeded';
-        state.items.unshift(action.payload);
-        state.current = action.payload;
+        state.items.push(action.payload);
+        // Not state.current: this payload is the lighter create-response
+        // shape (no `progress`, no `members`) — the detail page's own
+        // fetchProject(id) on mount is what populates `current` with the
+        // full shape it actually renders against.
       })
       .addCase(createProject.rejected, (state, action) => {
         state.createStatus = 'failed';

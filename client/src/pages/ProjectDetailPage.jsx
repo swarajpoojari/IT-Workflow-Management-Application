@@ -1,14 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useParams, useSearchParams, Link } from 'react-router-dom';
+import {
+  Gauge, ClipboardList, BarChart3, UserCog, Workflow as WorkflowIcon,
+  Users as UsersIcon, Paperclip, Link2, FileText,
+} from 'lucide-react';
 import { fetchProject, selectCurrentProject, selectProjectsStatus, selectProjectsError } from '../features/projects/projectsSlice.js';
 import { assignStage } from '../features/stages/stagesSlice.js';
 import { fetchUsers, fetchTeams, selectUsers, selectTeams } from '../features/users/usersSlice.js';
 import { usePermission } from '../hooks/usePermission.js';
 import { StageDrawer } from '../components/StageDrawer.jsx';
-import { Badge, ErrorNote, Spinner, StatusBadge, EmptyState } from '../components/ui/Bits.jsx';
+import { Badge, ErrorNote, Spinner, StatusBadge, EmptyState, PersonAvatar } from '../components/ui/Bits.jsx';
 import { StageProgressBar } from '../components/ui/StageProgressBar.jsx';
 import { usePageMeta } from '../hooks/usePageMeta.js';
+import { formatDate } from '../lib/date.js';
 
 const TABS = [
   ['overview', 'Overview'],
@@ -35,9 +40,12 @@ function OverviewTab({ project, onOpenStage }) {
     <div className="stack">
       <section className="card card-pad progress-card">
         <div className="progress-card-head">
-          <div>
-            <h3>Progress</h3>
-            <p className="muted xsmall">{p.completed} of {p.total} stages complete</p>
+          <div className="card-head-title">
+            <span className="panel-icon is-accent" aria-hidden="true"><Gauge size={16} /></span>
+            <div>
+              <h3>Progress</h3>
+              <p className="muted xsmall">{p.completed} of {p.total} stages complete</p>
+            </div>
           </div>
           <div className="progress-card-figure">
             <span className="progress-figure">{p.percentComplete}%</span>
@@ -71,7 +79,12 @@ function OverviewTab({ project, onOpenStage }) {
       </section>
 
       <section className="card card-pad">
-        <h3>Project details</h3>
+        <div className="card-head bare">
+          <div className="card-head-title">
+            <span className="panel-icon is-violet" aria-hidden="true"><ClipboardList size={16} /></span>
+            <h3>Project details</h3>
+          </div>
+        </div>
         <dl className="field-grid wide">
           <div><dt>Code</dt><dd className="mono">{project.code}</dd></div>
           <div><dt>BRD number</dt><dd className="mono">{project.brdNumber ?? '—'}</dd></div>
@@ -80,14 +93,19 @@ function OverviewTab({ project, onOpenStage }) {
           <div><dt>SOP template</dt><dd>{project.sopTemplateName}</dd></div>
           <div><dt>SOP version</dt><dd>v{project.sopVersionNumber} <Badge tone="neutral">locked</Badge></dd></div>
           <div><dt>Start date</dt><dd>{project.startDate ?? '—'}</dd></div>
-          <div><dt>Target end</dt><dd>{project.targetEndDate ?? '—'}</dd></div>
+          <div><dt>Target end</dt><dd>{formatDate(project.targetEndDate) ?? '—'}</dd></div>
           <div><dt>Status</dt><dd><Badge tone={DERIVED_TONE[p.derivedStatus]}>{p.derivedStatus.replace('_', ' ')}</Badge></dd></div>
         </dl>
         {project.description && <p className="muted small">{project.description}</p>}
       </section>
 
       <section className="card card-pad">
-        <h3>Stage breakdown</h3>
+        <div className="card-head bare">
+          <div className="card-head-title">
+            <span className="panel-icon is-amber" aria-hidden="true"><BarChart3 size={16} /></span>
+            <h3>Stage breakdown</h3>
+          </div>
+        </div>
         <div className="breakdown-row">
           {[['Completed', p.completed, 'green'], ['In progress', p.inProgress, 'accent'],
             ['Blocked', p.blocked, 'amber'], ['On hold', p.onHold, 'red'],
@@ -171,12 +189,15 @@ function AssignTab({ project, onChanged }) {
   return (
     <section className="card card-pad">
       <div className="card-head bare">
-        <div>
-          <h3>Stage owners, teams and dates</h3>
-          <p className="muted xsmall">
-            Assignment never changes a stage status. Each stage is owned by the team its SOP named,
-            and only that team&apos;s active members can take it.
-          </p>
+        <div className="card-head-title">
+          <span className="panel-icon is-green" aria-hidden="true"><UserCog size={16} /></span>
+          <div>
+            <h3>Stage owners, teams and dates</h3>
+            <p className="muted xsmall">
+              Assignment never changes a stage status. Each stage is owned by the team its SOP named,
+              and only that team&apos;s active members can take it.
+            </p>
+          </div>
         </div>
       </div>
 
@@ -189,7 +210,7 @@ function AssignTab({ project, onChanged }) {
       <div className="table-wrap">
         <table className="table assign-table">
           <thead>
-            <tr><th>#</th><th>Stage</th><th>Team</th><th>Owner</th><th>Due date</th><th>Status</th></tr>
+            <tr><th>SR NO</th><th>Stage</th><th>Team</th><th>Owner</th><th>Due date</th><th>Status</th></tr>
           </thead>
           <tbody>
             {project.stages.map((stage) => {
@@ -356,7 +377,7 @@ function TeamTab({ project }) {
                 <tr key={m.userId}>
                   <td>
                     <div className="user-cell">
-                      <span className="user-avatar">{m.fullName.slice(0, 1)}</span>
+                      <PersonAvatar name={m.fullName} />
                       <span>
                         <strong>{m.fullName}</strong>
                         <small className="muted">{m.email}</small>
@@ -492,9 +513,17 @@ export function ProjectDetailPage() {
     dispatch(fetchProject(id));
   };
 
-  if (status === 'loading' && !project) return <Spinner label="Loading project…" />;
-  if (error && !project) return <ErrorNote error={error} />;
-  if (!project) return null;
+  // `current` can briefly hold the lighter payload the create-project
+  // response returns (no `progress`, no `members` — those are only computed
+  // by the single-project fetch below) — rendering against that shape
+  // crashed the whole page right after creating a project. Only trust
+  // `current` once it's the full detail shape for *this* id.
+  const projectReady = project && String(project.id) === String(id) && project.progress;
+
+  if (!projectReady) {
+    if (status === 'loading' || !error) return <Spinner label="Loading project…" />;
+    return <ErrorNote error={error} />;
+  }
 
   return (
     <div className={`project-screen ${openStageId ? 'with-drawer' : ''}`}>
@@ -522,7 +551,7 @@ export function ProjectDetailPage() {
             <div><dt>Client</dt><dd>{project.clientName}</dd></div>
             <div><dt>Lead owner</dt><dd>{project.ownerName ?? '—'}</dd></div>
             <div><dt>Kickoff</dt><dd>{project.startDate ?? '—'}</dd></div>
-            <div><dt>Target completion</dt><dd>{project.targetEndDate ?? '—'}</dd></div>
+            <div><dt>Target completion</dt><dd>{formatDate(project.targetEndDate) ?? '—'}</dd></div>
             <div><dt>SOP version</dt><dd>v{project.sopVersionNumber}</dd></div>
           </dl>
         </header>
